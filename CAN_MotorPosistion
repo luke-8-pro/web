@@ -1,0 +1,870 @@
+#include "led.h"
+#include "delay.h"
+#include "key.h"
+#include "sys.h"
+#include "lcd.h"
+#include "usart.h"	 
+#include "can.h"
+#include <stdio.h>
+#include "timer.h"
+#include "math.h"
+
+#define FILTER_BUF_LEN		5
+#define ABS(x)		((x>0)? x: -x) 
+
+/************************************************
+				   PID½á¹¹Ìå
+************************************************/
+u8 CAN_MotorPosistionInit();
+
+u8 Inertial_navigation_data[24];   /*´Ó¹ßµ¼½ÓÊÕµ½µÄÊý¾Ý*/
+
+union{
+ u8 initData[24];
+ float ActVal[6];
+}posture;                                    /*ÁªºÏÌå´æÈ¡ÉÏÎ»»ú¸øµÄÊý¾Ý*/
+// 
+typedef enum
+{
+
+	PID_Position,
+	PID_Speed
+	
+}PID_ID;
+
+typedef struct _PID_TypeDef
+{
+	PID_ID id;
+	
+	float target;							//Ä¿±êÖµ
+	float lastNoneZeroTarget;
+	float kp;
+	float ki;
+	float kd;
+	
+	float   measure;					//²âÁ¿Öµ
+	float   err;							//Îó²î
+	float   last_err;      		//ÉÏ´ÎÎó²î
+	
+	float pout;
+	float iout;
+	float dout;
+	
+	float output;						//±¾´ÎÊä³ö
+	float last_output;			//ÉÏ´ÎÊä³ö
+	
+	float MaxOutput;				//Êä³öÏÞ·ù
+	float IntegralLimit;		//»ý·ÖÏÞ·ù
+	float DeadBand;			  //ËÀÇø£¨¾ø¶ÔÖµ£©
+	float ControlPeriod;		//¿ØÖÆÖÜÆÚ
+	float  Max_Err;					//×î´óÎó²î
+	
+					  uint32_t thistime;
+					uint32_t lasttime;
+						uint8_t dtime;	
+	
+	void (*f_param_init)(struct _PID_TypeDef *pid,  //PID²ÎÊý³õÊ¼»¯
+				   PID_ID id,
+				   uint16_t maxOutput,
+				   uint16_t integralLimit,
+				   float deadband,
+				   uint16_t controlPeriod,
+					int16_t max_err,     
+					int16_t  target,
+				   float kp,
+				   float ki,
+				   float kd);
+				   
+	void (*f_pid_reset)(struct _PID_TypeDef *pid, float kp,float ki, float kd);		//pidÈý¸ö²ÎÊýÐÞ¸Ä
+	float (*f_cal_pid)(struct _PID_TypeDef *pid, float measure);   //ÊäÈëËÙ¶ÈÄ¿Êµ²âÖµ£¬Êä³ö¿ØÖÆµçÁ÷Öµ
+}PID_TypeDef;
+
+PID_TypeDef drive_motor_pid[4];  //ËÄ¸öµç»ú
+PID_TypeDef lift_motor_pid[3];    
+
+
+/************************************************
+				   ½á¹¹ÌåÀàÐÍÊý×é
+************************************************/
+ struct message
+{
+	u8 index;
+  uint16_t position;  /*×ª×Ó»úÐµ½Ç¶È */
+  uint16_t ini_position;  /*×ª×Ó³õÊ¼»úÐµ½Ç¶È */
+  int16_t velocity; /*×ª×Ó×ªËÙ */
+  uint16_t torque;     /*Êä³ö×ª¾Ø*/
+  int  AccePosition;    /*Î»ÖÃÀÛ¼Ó*/
+	int32_t		round_cnt;
+	int lift_position_list[3];
+	u8 lift_order;
+	u8 lift_status;
+} motorstatus[8];
+/************************************************
+				½á¹¹ÌåÉùÃ÷±ä»»Á¿
+************************************************/
+
+
+
+int position_control(struct message tempMotor);   //ÌáÉýµç»úÎ»ÖÃËÙ¶È¿ØÖÆ
+void pid_init(PID_TypeDef* pid);                   
+void Velocity_decomposition(int32_t Vx_position,int32_t Vy_position);          //µ×ÅÌµç»úËÙ¶È½âËã
+void  sate_judgement(u8 N_4,u8 N_5,u8 N_6);     //×´Ì¬ÅÐ¶Ï
+void sendarry(USART_TypeDef*USARTx, u8* pBuffer,u16 len);   //Ö¸¶¨´®¿Ú·¢ËÍÊý¾Ý
+void Instruction_Verification();
+void send_lift_status(); 
+ 
+int32_t set_spd = 3;
+int flag_pid_cal_liftmotor=0,flag_pid_cal_drivemotor=0,flag_uart_send=0;
+u8 target_current_drive_motor[8]={0};
+u8 target_current_lift_motor[8]={0};
+u8 flag_startgetorder;//¿ªÊ¼½ÓÊÜ±êÖ¾Î»
+u8 flag_getpcmessage;//ÉÏÎ»»úÁ´½ÓµÄ´®¿Ú´¦ÍêÕû½ÓÊÕÁËÒ»Ö¡Êý¾ÝºóÖÃÎ»£»ÔÚÖ÷Ñ­»·ÖÐ½ÓÊÜÍêÊý¾Ý²¢Íê³É·¢ËÍºóÇå¿Õ£»
+u8 orderData[12];//ÉÏÎ»»ú½ÓÊÕÊý¾Ý
+u8 pcupsidedata[17];//ÏòÉÏÎ»»ú·¢ËÍµÄÊý¾Ý
+int32_t Vx,Vy;
+int pos_x=0,pos_y=0,zangle=0;
+u8 car_w;//Ð¡³µµ±Ç°×´Ì¬
+/************************************************
+				     Ö÷³ÌÐò¿ªÊ¼
+************************************************/
+
+ int main(void)
+ {	 
+  u16 ti=0;                     //forÑ­»··¢ËÍÊý
+	int i,di;
+	u8 t=0;                    //led¼ÆÊý
+	u8 cnt=0;                 //¼ÆÊýÆ÷£¬¼à²â³ÌÐòÔËÐÐ	             
+	                    
+	u8 mode=CAN_Mode_LoopBack;//CAN¹¤×÷Ä£Ê½;CAN_Mode_Normal(0)£ºÆÕÍ¨Ä£Ê½£¬CAN_Mode_LoopBack(1)£º»·»ØÄ£Ê½ ×Ô·¢×ÔÊÕÓÃÓÚ¼ìÑé
+ 
+	delay_init();	    	 //ÑÓÊ±º¯Êý³õÊ¼»¯	  
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);//ÉèÖÃÖÐ¶ÏÓÅÏÈ¼¶·Ö×éÎª×é2£º2Î»ÇÀÕ¼ÓÅÏÈ¼¶£¬2Î»ÏìÓ¦ÓÅÏÈ¼¶£¬can½ÓÊÕ·¢ËÍÒ²ÐèÒªÖÐ¶Ï
+	uart_init(9600);	 	//´®¿Ú1³õÊ¼»¯Îª9600
+  usart2_init(115200);  //´®¿Ú2³õÊ¼»¯Îª9600
+	LED_Init();		  		//³õÊ¼»¯ÓëLEDÁ¬½ÓµÄÓ²¼þ½Ó¿Ú
+	LCD_Init();			   	//³õÊ¼»¯LCD	 
+  TIM3_Int_Init(9,719);    //¿ªÆô¶¨Ê±ÖÐ¶Ï½ÓÊÕcanÊý¾Ý0.1ms   (9+1)*(7199+1)/72/1000
+
+	CAN_Mode_Init(CAN_SJW_1tq,CAN_BS2_8tq,CAN_BS1_9tq,2,CAN_Mode_Normal);//CAN³õÊ¼»¯»·»ØÄ£Ê½,²¨ÌØÂÊ1MKbps   CAN_Mode_LoopBackÎª1£¬ÊÇ»Ø»·Ä£Ê½ ,CAN_Mode_Normal ÎªÕý³£Ä£Ê½   1MKbps=1000kbps(±ÈÌØÂÊ )36/(8+9+1)*2
+
+	 
+	//delay_ms(2000);
+	 for(di=0; di<4; di++)
+  {	
+
+    pid_init(&drive_motor_pid[di]);
+		
+   drive_motor_pid[di].f_param_init(&drive_motor_pid[di],PID_Speed,16384,5000,10,0,8000,0,6,0.1,0.1);
+    
+  }
+	for(di=0; di<3; di++)
+  {	
+
+    pid_init(&lift_motor_pid[di]);
+   lift_motor_pid[di].f_param_init(&lift_motor_pid[di],PID_Speed,16384,5000,10,0,8000,0,0.6,0.1,0.1);
+    
+  }	
+	CAN_MotorPosistionInit();
+
+
+ 	while(1)
+	{
+
+		if(flag_getpcmessage)
+		 
+		{
+		
+			Velocity_decomposition(Vx,Vy);	                                //1.·Ö½âVX,VYÎªËÄ¸öÇý¶¯µç»úµÄÊµÊ±×ªËÙÖ¸Áî,ÅÐ¶ÏWÖ¸Áî
+//			USART_SendData(USART1,'O');//Ïò´®¿Ú·¢ËÍÊý¾Ý
+//			while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå
+//			USART_SendData(USART1,Vy>>24);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+//			while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå
+//			USART_SendData(USART1,Vy>>16);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+//			while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå
+//			USART_SendData(USART1,Vy>>8);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+//			while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå
+//			USART_SendData(USART1,Vy);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+//			while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå
+//			USART_SendData(USART1,'D');//Ïò´®¿Ú·¢ËÍÊý¾Ý
+//			while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå
+			pcupsidedata[0]='A';
+			pcupsidedata[1]=pos_x>>24|0x00;
+			pcupsidedata[2]=pos_x>>16|0x00;
+			pcupsidedata[3]=pos_x>>8|0x00;
+			pcupsidedata[4]=pos_x|0x00;
+			
+			pcupsidedata[5]=pos_y>>24|0x00;
+			pcupsidedata[6]=pos_y>>16|0x00;
+			pcupsidedata[7]=pos_y>>8|0x00;
+			pcupsidedata[8]=pos_y|0x00;
+			
+			pcupsidedata[9]=zangle>>24|0x00;
+			pcupsidedata[10]=zangle>>16|0x00;
+			pcupsidedata[11]=zangle>>8|0x00;
+			pcupsidedata[12]=zangle|0x00;
+		
+			pcupsidedata[13]=motorstatus[4].lift_status;
+			pcupsidedata[14]=motorstatus[5].lift_status;
+			pcupsidedata[15]=motorstatus[6].lift_status;
+			pcupsidedata[16]='W';
+			sendarry(USART1,pcupsidedata,17); 
+			flag_getpcmessage=0;		
+		}							
+		
+		if(flag_pid_cal_drivemotor>=10)
+		{
+			
+ 
+		
+			
+			drive_motor_pid[0].f_cal_pid(&drive_motor_pid[0],motorstatus[0].velocity ); //1ºÅµç»úËÙ¶ÈPID¿ØÖÆ
+			target_current_drive_motor[0]=(int)drive_motor_pid[0].output>>8;
+			target_current_drive_motor[1]=(int)drive_motor_pid[0].output;
+			drive_motor_pid[1].f_cal_pid(&drive_motor_pid[1],motorstatus[1].velocity ); //2ºÅµç»úËÙ¶ÈPID¿ØÖÆ
+			target_current_drive_motor[2]=(int)drive_motor_pid[1].output>>8;
+			target_current_drive_motor[3]=(int)drive_motor_pid[1].output;
+			drive_motor_pid[2].f_cal_pid(&drive_motor_pid[2],motorstatus[2].velocity ); //3ºÅµç»úËÙ¶ÈPID¿ØÖÆ
+			target_current_drive_motor[4]=(int)drive_motor_pid[2].output>>8;
+			target_current_drive_motor[5]=(int)drive_motor_pid[2].output;
+			drive_motor_pid[3].f_cal_pid(&drive_motor_pid[3],motorstatus[3].velocity ); //4ºÅµç»úËÙ¶ÈPID¿ØÖÆ
+			target_current_drive_motor[6]=(int)drive_motor_pid[3].output>>8;
+			target_current_drive_motor[7]=(int)drive_motor_pid[3].output; //µÃµ½ËÄÌ¨µç»úÄ¿±êµçÁ÷	
+		}
+		if(flag_pid_cal_liftmotor>=100)
+			{
+				sate_judgement(motorstatus[4].lift_order,motorstatus[5].lift_order,motorstatus[6].lift_order);												          //2.ÅÐ¶ÏÌáÉýµç»úÖ¸ÁîÓëµ±Ç°×´Ì¬ÊÇ·ñÒ»ÖÂ£¿µ±Ç°×´Ì¬²»±ä£ºµ±Ç°×´Ì¬±ä³É"3"£»
+				lift_motor_pid[0].target=position_control(motorstatus[4]);
+				lift_motor_pid[1].target=position_control(motorstatus[5]);
+				lift_motor_pid[2].target=position_control(motorstatus[6]);
+	
+			
+				lift_motor_pid[0].f_cal_pid(&lift_motor_pid[0],motorstatus[4].velocity ); //µÚÒ»ÌáÉýµç»ú5ºÅËÙ¶ÈPID¿ØÖÆ
+				target_current_lift_motor[0]=(int)lift_motor_pid[0].output>>8;
+				target_current_lift_motor[1]=(int)lift_motor_pid[0].output;
+				lift_motor_pid[1].f_cal_pid(&lift_motor_pid[1],motorstatus[5].velocity ); //µÚ¶þÌáÉýµç»ú6ºÅËÙ¶ÈPID¿ØÖÆ
+				target_current_lift_motor[2]=(int)lift_motor_pid[1].output>>8;
+				target_current_lift_motor[3]=(int)lift_motor_pid[1].output;
+				lift_motor_pid[2].f_cal_pid(&lift_motor_pid[2],motorstatus[6].velocity ); //µÚÈýÌáÉýµç»ú7ºÅËÙ¶ÈPID¿ØÖÆ
+				target_current_lift_motor[4]=(int)lift_motor_pid[2].output>>8;
+				target_current_lift_motor[5]=(int)lift_motor_pid[2].output;
+			
+			}
+	
+		
+		
+		if((flag_pid_cal_drivemotor>=10)|(flag_pid_cal_liftmotor>=100))
+		{
+			
+			//u8 tempVector[8]={0x02,0x00,0x00,0x00,0x00,0x00,0x00,0x00}; 
+			flag_pid_cal_drivemotor=0;
+			flag_pid_cal_liftmotor=0;
+			                            
+			Can_Send_Msg(target_current_drive_motor,8);	            //·¢ËÍ±êÊ¶·ûÎª0x0200Êý¾ÝÖ¡		
+      Can_Send_Msg2(target_current_lift_motor,8);	          //·¢ËÍ±êÊ¶·ûÎª0x01ffÊý¾ÝÖ¡			
+			delay_ms(10);
+		}
+
+		
+		if(flag_uart_send>=50000)
+		{   u16 tempVector[8]={0x0200,0x0201,0x0202,0x0203,0x0204,0x0205,0x0206,0x0207};
+				flag_uart_send=0;
+			
+		}		
+		
+	}
+}
+ 
+
+
+/************************************************
+						  ´®¿Ú1ÖÐ¶Ï·þÎñ³ÌÐò 
+************************************************/
+
+
+void USART1_IRQHandler(void)                	
+{   
+   
+	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)  //½ÓÊÕÖÐ¶Ï
+	{  
+		static u8 count_receive=0;  
+		u8 Res=0;
+		static int count_data=0; 	
+		USART_ClearITPendingBit(USART1,USART_IT_RXNE);	
+		Res =USART_ReceiveData(USART1);
+		
+		switch (count_receive)
+		{
+			case 0:
+			if(Res=='O') count_receive++;
+			else  count_receive=0;
+			break;
+			case 1: 		 
+			orderData[count_data]=Res;
+			count_data++;
+			if(count_data>=12){count_data=0;count_receive++;}
+			break;		
+			case 2: 
+			if(Res=='D')
+			{
+			flag_getpcmessage=1;
+			Vx=orderData[0]<<24|orderData[1]<<16|orderData[2]<<8|orderData[3];
+			Vy=orderData[4]<<24|orderData[5]<<16|orderData[6]<<8|orderData[7];
+			car_w=orderData[8];
+			motorstatus[4].lift_order=orderData[9]; 
+			motorstatus[5].lift_order=orderData[10];
+			motorstatus[6].lift_order=orderData[11];
+			}
+			count_receive=0;count_data=0;break;
+	default:
+	count_receive=0;break;
+
+
+
+	}
+//        	 if(n>=8){n=0;}				    //»º³åÇø³¬¹ý8£¬¸²¸ÇµÚÒ»Î»		 
+} 
+}
+/************************************************
+						  ´®¿Ú2ÖÐ¶Ï·þÎñ³ÌÐò 
+************************************************/
+
+
+void USART2_IRQHandler(void)                	
+{   
+   static  u8 ch,count=0,i=0;
+					if(USART_GetITStatus(USART2, USART_IT_RXNE) != RESET)  //½ÓÊÕÖÐ¶Ï
+					{  USART_ClearITPendingBit(USART2,USART_IT_RXNE);	
+ 						ch=USART_ReceiveData(USART2);
+						switch(count)
+						{
+							 case 0:{if(ch==0x0d) count++;else  count=0; break;}	 
+      case 1:
+			  {
+						 if(ch==0x0a)        {i=0;count++;}
+						 else if(ch==0x0d);
+						 else                {count=0;}
+						 break;		
+			  }	 
+      case 2:posture.initData[i]=ch;i++;
+	           if(i>=24){i=0;count++;}
+						 break;		
+		  case 3:{if(ch==0x0a) count++;else count=0;  break;}	 	
+			case 4:
+							if(ch==0x0d){
+								zangle=(int)(posture.ActVal[0]*100);
+								pos_x=(int)(posture.ActVal[3]*100);
+								pos_y=(int)(posture.ActVal[4]*100); 
+							 } count=0;break;
+			     default:count=0;break;				
+						}
+					}
+} 
+/************************************************
+						 Ö¸¶¨´®¿Ú·¢ËÍ³ÌÐò
+************************************************/
+
+void sendarry(USART_TypeDef*USARTx, u8* pBuffer,u16 len)
+{ 
+   u16 i=0;
+	 for(i=0;i<len;i++)
+					{
+						USART_SendData(USARTx,pBuffer[i]);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+						while(USART_GetFlagStatus(USARTx,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå0
+	
+					}	
+}
+
+
+
+
+
+/************************************************
+			  canÊý¾Ý½ÓÊÕ³õÊ¼»¯
+************************************************/
+u8 CAN_MotorPosistionInit()
+{
+	u8 init_count=0;
+	u8 tempCount=0;
+	CanRxMsg RxMessage;
+	
+	int i;
+	for (i=0;i<7;i++){
+		motorstatus[i].round_cnt=0;
+		motorstatus[i].AccePosition=0;
+	}
+	while(init_count!=0X7F)
+	{
+		if( CAN_MessagePending(CAN1,CAN_FIFO0)==0) delay_ms(1);		//Ã»ÓÐ½ÓÊÕµ½Êý¾Ý,Ö±½ÓÍË³ö   		
+		else
+		{
+			CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);//¶ÁÈ¡Êý¾Ý	
+			switch(RxMessage.StdId)
+				{				
+				case 0x0201 :   motorstatus[0].index=1;motorstatus[0].ini_position=RxMessage.Data[0]<<8|RxMessage.Data[1];motorstatus[0].position=motorstatus[0].ini_position; init_count=init_count|0X01;break;            //°ÑÊý¾Ý´æµ½1ºÅµç»úµÄÃûÏÂ £»break;  
+				case 0x0202 :   motorstatus[1].index=2;motorstatus[1].ini_position=RxMessage.Data[0]<<8|RxMessage.Data[1];motorstatus[1].position=motorstatus[1].ini_position; init_count=init_count|0X02;break;            //°ÑÊý¾Ý´æµ½1ºÅµç»úµÄÃûÏÂ £»break;  
+				case 0x0203 :   motorstatus[2].index=3;motorstatus[2].ini_position=RxMessage.Data[0]<<8|RxMessage.Data[1]; motorstatus[2].position=motorstatus[2].ini_position;init_count=init_count|0X04;break;            //°ÑÊý¾Ý´æµ½1ºÅµç»úµÄÃûÏÂ £»break;  
+				case 0x0204 :   motorstatus[3].index=4;motorstatus[3].ini_position=RxMessage.Data[0]<<8|RxMessage.Data[1]; motorstatus[3].position=motorstatus[3].ini_position;init_count=init_count|0X08;break;            //°ÑÊý¾Ý´æµ½1ºÅµç»úµÄÃûÏÂ £»break;  
+				case 0x0205 :   motorstatus[4].index=5;motorstatus[4].ini_position=RxMessage.Data[0]<<8|RxMessage.Data[1]; motorstatus[4].position=motorstatus[4].ini_position;init_count=init_count|0X10;
+					motorstatus[4].lift_position_list[0]=0;motorstatus[4].lift_position_list[1]=360*36*(-2); motorstatus[4].lift_position_list[2]=360*36*(-4)-5000;motorstatus[4].lift_status=0;motorstatus[4].lift_order=0;    break; //°ÑÊý¾Ý´æµ½5ºÅµç»úµÄÃûÏÂ £»break;  
+				case 0x0206 :   motorstatus[5].index=6;motorstatus[5].ini_position=RxMessage.Data[0]<<8|RxMessage.Data[1]; motorstatus[5].position=motorstatus[5].ini_position;init_count=init_count|0X20;           //°ÑÊý¾Ý´æµ½1ºÅµç»úµÄÃûÏÂ £»break;  
+					motorstatus[5].lift_position_list[0]=0;motorstatus[5].lift_position_list[1]=360*36*(-2);motorstatus[5].lift_position_list[2]=360*36*(-2);motorstatus[5].lift_status=0;motorstatus[5].lift_order=0; break; //°ÑÊý¾Ý´æµ½6ºÅµç»úµÄÃûÏÂ £»break;  
+				case 0x0207 :   motorstatus[6].index=7;motorstatus[6].ini_position=RxMessage.Data[0]<<8|RxMessage.Data[1]; motorstatus[6].position=motorstatus[6].ini_position;init_count=init_count|0X40;            //°ÑÊý¾Ý´æµ½1ºÅµç»úµÄÃûÏÂ £»break;  
+					motorstatus[6].lift_position_list[0]=0;motorstatus[6].lift_position_list[1]=360*36*(-2);motorstatus[6].lift_position_list[2]=360*36*(-4)-5000;motorstatus[5].lift_status=0;motorstatus[6].lift_order=0;break; //°ÑÊý¾Ý´æµ½7ºÅµç»úµÄÃûÏÂ £»break;  
+				}
+		}
+		tempCount++;
+	
+	}
+	return 0;
+}
+
+/************************************************
+			  canÊý¾Ý½ÓÊÕÌáÈ¡³ÌÐò
+************************************************/
+u8 CanRecieveMsg(){
+	CanRxMsg RxMessage;
+	if( CAN_MessagePending(CAN1,CAN_FIFO0)==0)return 0;		//Ã»ÓÐ½ÓÊÕµ½Êý¾Ý,Ö±½ÓÍË³ö   
+	CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);//¶ÁÈ¡Êý¾Ý	
+	switch(RxMessage.StdId)
+		{
+		uint16_t old_position=0;			
+		case 0x0201 :                //°ÑÊý¾Ý´æµ½1ºÅµç»úµÄÃûÏÂ £»break;  
+			old_position= motorstatus[0].position;
+			motorstatus[0].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		  if((motorstatus[0].position-old_position)>4096)
+				{
+				motorstatus[0].round_cnt--;	
+				}	
+				 if((motorstatus[0].position-old_position)<-4096)
+				{
+				motorstatus[0].round_cnt++;	
+				}	
+			motorstatus[0].AccePosition=motorstatus[0].round_cnt*360+(motorstatus[0].position-motorstatus[0].ini_position)*360/8192;
+			motorstatus[0].velocity=RxMessage.Data[2]<<8|RxMessage.Data[3];
+			if(motorstatus[0].velocity>30000) motorstatus[0].velocity-=65536;
+			motorstatus[0].torque=RxMessage.Data[4]<<8|RxMessage.Data[5];
+			break;				
+		case 0x0202:
+		  old_position= motorstatus[1].position;
+			motorstatus[1].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		  if((motorstatus[1].position-old_position)>4096)
+				{
+				motorstatus[1].round_cnt--;	
+				}	
+				 if((motorstatus[1].position-old_position)<-4096)
+				{
+				motorstatus[1].round_cnt++;	
+				}	
+			 motorstatus[1].AccePosition=motorstatus[1].round_cnt*360+(motorstatus[1].position-motorstatus[1].ini_position)*360/8192;			
+			 motorstatus[1].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		   motorstatus[1].velocity=RxMessage.Data[2]<<8|RxMessage.Data[3];
+			if(motorstatus[1].velocity>30000) motorstatus[0].velocity-=65536;
+		   motorstatus[1].torque=RxMessage.Data[4]<<8|RxMessage.Data[5];
+	
+		   break;
+		case 0x0203:
+			old_position= motorstatus[2].position;
+			motorstatus[2].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		  if((motorstatus[2].position-old_position)>4096)
+				{
+				motorstatus[2].round_cnt--;	
+				}	
+				 if((motorstatus[2].position-old_position)<-4096)
+				{
+				motorstatus[2].round_cnt++;	
+				}	
+		 	 motorstatus[2].AccePosition=motorstatus[2].round_cnt*360+(motorstatus[2].position-motorstatus[2].ini_position)*360/8192;		
+			 motorstatus[2].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		   motorstatus[2].velocity=RxMessage.Data[2]<<8|RxMessage.Data[3];
+			if(motorstatus[2].velocity>30000) motorstatus[0].velocity-=65536;
+		   motorstatus[2].torque=RxMessage.Data[4]<<8|RxMessage.Data[5];
+		   break;
+		case 0x0204:
+			old_position= motorstatus[3].position;
+				motorstatus[3].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+				if((motorstatus[3].position-old_position)>4096)
+					{
+					motorstatus[3].round_cnt--;	
+					}	
+					 if((motorstatus[3].position-old_position)<-4096)
+					{
+					motorstatus[3].round_cnt++;	
+					}	
+			 motorstatus[3].AccePosition=motorstatus[3].round_cnt*360+(motorstatus[3].position-motorstatus[3].ini_position)*360/8192;			
+			 motorstatus[3].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		   motorstatus[3].velocity=RxMessage.Data[2]<<8|RxMessage.Data[3];
+			if(motorstatus[3].velocity>30000) motorstatus[0].velocity-=65536;
+		   motorstatus[3].torque=RxMessage.Data[4]<<8|RxMessage.Data[5];
+		   break;
+		case 0x0205:
+			old_position= motorstatus[4].position;
+			motorstatus[4].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		  if((motorstatus[4].position-old_position)>4096)
+				{
+				motorstatus[4].round_cnt--;	
+				}	
+				 if((motorstatus[4].position-old_position)<-4096)
+				{
+				motorstatus[4].round_cnt++;	
+				}	
+			 motorstatus[4].AccePosition=(int)(motorstatus[4].round_cnt*360+(motorstatus[4].position-motorstatus[4].ini_position)*360/8192);
+			 motorstatus[4].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		   motorstatus[4].velocity=RxMessage.Data[2]<<8|RxMessage.Data[3];
+			if(motorstatus[4].velocity>30000) motorstatus[0].velocity-=65536;
+		   motorstatus[4].torque=RxMessage.Data[4]<<8|RxMessage.Data[5];
+		   break;
+		case 0x0206:
+		old_position= motorstatus[5].position;
+			motorstatus[5].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		  if((motorstatus[5].position-old_position)>6000)
+				{
+				motorstatus[5].round_cnt--;	
+				}	
+				 if((motorstatus[5].position-old_position)<-6000)
+				{
+				motorstatus[5].round_cnt++;	
+				}	
+			motorstatus[5].AccePosition=(int)(motorstatus[5].round_cnt*360+(motorstatus[5].position-motorstatus[5].ini_position)*360/8192);	
+			 motorstatus[5].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		   motorstatus[5].velocity=RxMessage.Data[2]<<8|RxMessage.Data[3];
+			if(motorstatus[5].velocity>30000) motorstatus[0].velocity-=65536;
+		   motorstatus[5].torque=RxMessage.Data[4]<<8|RxMessage.Data[5];
+		   break;
+		case 0x0207:
+		old_position= motorstatus[6].position;
+			motorstatus[6].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		  if((motorstatus[6].position-old_position)>4096)
+				{
+				motorstatus[6].round_cnt--;	
+				}	
+				 if((motorstatus[6].position-old_position)<-4096)
+				{
+				motorstatus[6].round_cnt++;	
+				}	
+			motorstatus[6].AccePosition=(int)(motorstatus[6].round_cnt*360+(motorstatus[6].position-motorstatus[6].ini_position)*360/8192);		
+			 motorstatus[6].position=RxMessage.Data[0]<<8|RxMessage.Data[1];
+		   motorstatus[6].velocity=RxMessage.Data[2]<<8|RxMessage.Data[3];
+			if(motorstatus[6].velocity>30000) motorstatus[0].velocity-=65536;
+		   motorstatus[6].torque=RxMessage.Data[4]<<8|RxMessage.Data[5];
+		   break;
+		default:
+			return 0;
+		}
+		return RxMessage.DLC;	
+}
+
+
+
+
+void TIM3_IRQHandler(void)   //TIM3ÖÐ¶Ï
+{
+	static int led_count=0;
+	
+	if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)  //¼ì²éTIM3¸üÐÂÖÐ¶Ï·¢ÉúÓë·ñ
+		{
+		TIM_ClearITPendingBit(TIM3, TIM_IT_Update  );  //Çå³ýTIMx¸üÐÂÖÐ¶Ï±êÖ¾ 
+	   CanRecieveMsg();      
+			flag_pid_cal_drivemotor++;
+			flag_pid_cal_liftmotor++;
+			flag_uart_send++;
+			led_count++;
+			if(led_count>5000)
+			{
+			LED0=!LED0;         //ÌáÊ¾ÏµÍ³ÕýÔÚÔËÐÐ	
+			led_count=0;	
+			}
+			
+		}
+}
+
+
+
+/*²ÎÊý³õÊ¼»¯--------------------------------------------------------------*/
+static void pid_param_init(
+	PID_TypeDef * pid, 
+	PID_ID   id,
+	uint16_t maxout,
+	uint16_t intergral_limit,
+	float deadband,
+	uint16_t period,
+	int16_t  max_err,
+	int16_t  target,
+
+	float 	kp, 
+	float 	ki, 
+	float 	kd)
+{
+	pid->id = id;		
+	
+	pid->ControlPeriod = period;             //Ã»ÓÃµ½
+	pid->DeadBand = deadband;
+	pid->IntegralLimit = intergral_limit;
+	pid->MaxOutput = maxout;
+	pid->Max_Err = max_err;
+	pid->target = target;
+	
+	pid->kp = kp;
+	pid->ki = ki;
+	pid->kd = kd;
+	
+	pid->output = 0;
+}
+
+/*ÖÐÍ¾¸ü¸Ä²ÎÊýÉè¶¨--------------------------------------------------------------*/
+static void pid_reset(PID_TypeDef * pid, float kp, float ki, float kd)
+{
+	pid->kp = kp;
+	pid->ki = ki;
+	pid->kd = kd;
+}
+
+/*pid¼ÆËã-----------------------------------------------------------------------*/
+
+	
+static float pid_calculate(PID_TypeDef* pid, float measure)
+{
+
+	
+	
+	pid->measure = measure;
+
+		
+	pid->last_err  = pid->err;
+	pid->last_output = pid->output;
+	
+	pid->err = pid->target - pid->measure;  //Îó²î
+	
+	//ÊÇ·ñ½øÈëËÀÇø
+	if((ABS(pid->err) > pid->DeadBand))   //Îó²î´óÓÚËÀÇø
+	{
+		pid->pout = pid->kp * pid->err;    //pÊä³öÎªKp*Îó²î
+		pid->iout += (pid->ki * pid->err);   //iÊä³öÎªi+ki*Îó²î
+		 
+
+		pid->dout =  pid->kd * (pid->err - pid->last_err);  //dÊä³öÎªkd*£¨Îó²î-ÉÏ´ÎÎó²î£©
+		
+		//»ý·ÖÊÇ·ñ³¬³öÏÞÖÆ
+		if(pid->iout > pid->IntegralLimit)
+			pid->iout = pid->IntegralLimit;       
+		if(pid->iout < - pid->IntegralLimit)
+			pid->iout = - pid->IntegralLimit;
+		
+		//pidÊä³öºÍ
+		pid->output = pid->pout + pid->iout + pid->dout;   
+		
+
+		//pid->output = pid->output*0.7f + pid->last_output*0.3f;  //ÂË²¨£¿
+		if(pid->output>pid->MaxOutput)         
+		{
+			pid->output = pid->MaxOutput;
+		}
+		if(pid->output < -(pid->MaxOutput))
+		{
+			pid->output = -(pid->MaxOutput);
+		}
+	
+	}
+
+
+	return pid->output;
+}
+
+
+void pid_init(PID_TypeDef* pid)
+{
+	pid->f_param_init = pid_param_init;
+	pid->f_pid_reset = pid_reset;
+	pid->f_cal_pid = pid_calculate;
+}
+
+/************************************************
+             Î»ÖÃËÙ¶È±Õ»·¿ØÖÆ
+************************************************/
+int position_control(struct message tempMotor)
+{
+		int Lc,Lt;
+		int16_t Vc;
+		int ati,Vmax,Vmin,a0,Vt,dL,e;
+		float dt;
+		Vmax=5000;
+		Vmin=100;	
+		a0=2000;
+		dt=0.01;
+		e=1000;		
+		Lt=tempMotor.lift_position_list[tempMotor.lift_order];
+		Lc=tempMotor.AccePosition;
+//		Lt=0;
+//		Lc=-51840;	
+		Vc=tempMotor.velocity;
+
+		dL=ABS(Lt-Lc);
+		ati=((Lt-Lc)>0?1:-1);
+		//ati=(Lt-Lc)/dL;
+		if(dL<=e)
+		{
+			Vt=0;
+			
+			return 0;
+		}
+		else{
+			if((Vc*ati)<-50)
+			{
+				Vt=0;
+				return 0;
+			}
+			else
+			{
+				if(dL<=((Vc*Vc)/(2*a0)))
+				{
+					Vt=(sqrt(2*a0*dL))*ati;	
+				}
+				else
+				{
+					if(ABS(Vc)<=Vmax)
+					{
+						Vt=Vc+a0*dt*ati;
+						
+					}
+				}
+				if(ABS(Vt)<=Vmin)
+				{
+					Vt=Vmin*ati;
+				}
+				else if(ABS(Vt)>Vmax)
+				{
+					Vt=Vmax*ati;
+				}
+						
+			}
+	}			
+		//tempMotor.lift_status=3;		
+			return Vt;
+}
+/************************************************
+           ·Ö½âµ×ÅÌËÙ¶È
+************************************************/
+
+void Velocity_decomposition(int32_t Vx_position,int32_t Vy_position)
+{
+
+if(Vx_position||Vy_position)
+{
+										drive_motor_pid[0].target=(float)(Vx_position*0.069)-(float)(Vy_position*0.069);
+										drive_motor_pid[1].target=-(float)(Vx_position*0.069)-(float)(Vy_position*0.069);
+										drive_motor_pid[2].target=-(float)(Vx_position*0.069)+(float)(Vy_position*0.069);
+										drive_motor_pid[3].target=(float)(Vx_position*0.069)+(float)(Vy_position*0.069);									 
+//-(float)(Vy_position*0.069)
+//-(float)(Vy_position*0.069)
+//+(float)(Vy_position*0.069)
+//(float)(Vy_position*0.069)
+}
+else
+
+		{
+				drive_motor_pid[0].target=0;
+				drive_motor_pid[1].target=0;
+				drive_motor_pid[2].target=0;
+				drive_motor_pid[3].target=0;	
+		}
+if(car_w==0x01)
+{
+       drive_motor_pid[0].target=60;
+			 drive_motor_pid[1].target=60;
+			 drive_motor_pid[2].target=60;
+			 drive_motor_pid[3].target=60;	  	
+	
+}
+else if(car_w==0x02)
+{
+			drive_motor_pid[0].target=-60;
+			drive_motor_pid[1].target=-60;
+			drive_motor_pid[2].target=-60;
+			drive_motor_pid[3].target=-60;
+	
+}
+else if(car_w==0x00)
+{
+      drive_motor_pid[0].target=0;
+			drive_motor_pid[1].target=0;
+			drive_motor_pid[2].target=0;
+			drive_motor_pid[3].target=0;	
+}
+
+}
+		
+	
+/************************************************
+              ÅÐ¶Ïµç»úµ±Ç°×´Ì¬
+************************************************/
+void  sate_judgement(u8 N_4,u8 N_5,u8 N_6){
+	
+	if(motorstatus[4].lift_status==N_4)
+	{
+		motorstatus[4].lift_status=N_4;
+	}
+	else
+	{
+	
+		if(ABS(motorstatus[4].AccePosition-motorstatus[4].lift_position_list[N_4])>1000)
+		{
+		 motorstatus[4].lift_status=3;	
+		}
+		else
+		{
+		 motorstatus[4].lift_status=N_4;
+		}
+		
+	}
+	if(motorstatus[5].lift_status==N_5)
+	{
+		motorstatus[5].lift_status=N_5;
+	}
+	else
+	{
+		
+		if(ABS(motorstatus[5].AccePosition-motorstatus[5].lift_position_list[N_5])>1000)
+		{
+		 motorstatus[5].lift_status=3;	
+		}
+		else
+		{
+		motorstatus[5].lift_status=N_5;	
+		}
+	}
+	if(motorstatus[6].lift_status==N_6)
+	{
+		motorstatus[6].lift_status=N_6;
+	}
+	else
+	{
+		
+		if(ABS(motorstatus[6].AccePosition-motorstatus[6].lift_position_list[N_6])>1000)
+		{
+		 motorstatus[6].lift_status=3;	
+		}
+		else
+		{
+		motorstatus[6].lift_status=N_6;	
+		}
+	}
+
+}
+/************************************************             
+               ·¢ËÍÌáÉýµç»ú×´Ì¬
+************************************************/
+void send_lift_status()
+{
+ 
+		USART_SendData(USART1,motorstatus[4].lift_status);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+		while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå0
+		USART_SendData(USART1,motorstatus[5].lift_status);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+		while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå0
+		USART_SendData(USART1,motorstatus[6].lift_status);//Ïò´®¿Ú·¢ËÍÊý¾Ý
+		while(USART_GetFlagStatus(USART1,USART_FLAG_TC)!=SET);//·¢ËÍÍê³ÉºóTCÎ»±»Ó²¼þÇå0		
+	
+}
+/************************************************             
+           end
+************************************************/
+
+
