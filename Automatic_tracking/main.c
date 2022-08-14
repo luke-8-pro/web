@@ -1,8 +1,7 @@
 #define  uchar unsigned char
 /*-----------------------------------------------
-  Ãû³Æ£º³¬ÉùµçÔ´¿ØÖÆ³ÌĞò
-  ±àĞ´£ºº«À¤
-  µ¥Î»£º´óÁ¬Àí¹¤´óÑ§
+  åç§°ï¼šè¶…å£°æ³¢å‘ç”Ÿå™¨æ§åˆ¶ç¨‹åº
+  ç¼–å†™ï¼šæŸ³èƒœåŒ
 ------------------------------------------------*/  
 #include <reg52.h>                
 #include "i2c.h"
@@ -17,8 +16,8 @@
 #include <key_iden.h>		
 #include <display_char.h>
 
-#define AddWr 0x90   //Ğ´Êı¾İµØÖ· 
-#define AddRd 0x91   //¶ÁÊı¾İµØÖ·
+#define AddWr 0x90   //å†™æ•°æ®åœ°å€ 
+#define AddRd 0x91   //è¯»æ•°æ®åœ°å€
 
 extern bit ack;
 unsigned char ReadADC(unsigned char Chl);
@@ -26,39 +25,39 @@ bit WriteDAC(unsigned char dat);
 //void Get_dianliu1_and_display();
 //void Get_dianliu2_and_display();
 
-sbit inde_switch0=P0^4;					   //ÏàÎ»¸ú×ÙÖĞÓÃ
-sbit kx=P0^0;							   //ÊÖ¶¯×Ô¶¯ÇĞ»»¶Ë¿Ú
-sbit inde_switch4=P0^5;					   //ÏàÎ»¸ú×ÙÖĞÓÃ
-sbit dy=P0^7;							   //ÅĞ¶ÏµçÔ´ĞÅºÅÊÇ·ñ½ÓÍ¨¶Ë¿Ú
-sbit bj=P0^3;							   //²½½øÑ¡Ôñ
-sbit sp=P1^1;							   //ÆµÂÊÉè¶¨
-sbit error_IF=P1^0;						   //±¨¾¯
+sbit inde_switch0=P0^4;					   //ç›¸ä½è·Ÿè¸ªä¸­ç”¨
+sbit kx=P0^0;							   //æ‰‹åŠ¨è‡ªåŠ¨åˆ‡æ¢ç«¯å£
+sbit inde_switch4=P0^5;					   //ç›¸ä½è·Ÿè¸ªä¸­ç”¨
+sbit dy=P0^7;							   //åˆ¤æ–­ç”µæºä¿¡å·æ˜¯å¦æ¥é€šç«¯å£
+sbit bj=P0^3;							   //æ­¥è¿›é€‰æ‹©
+sbit sp=P1^1;							   //é¢‘ç‡è®¾å®š
+sbit error_IF=P1^0;						   //æŠ¥è­¦
 
 unsigned char num1=0,num2=0,i;
-float Voltage1=0;        //¶¨Òå¸¡µã±äÁ¿	 //Êµ¼ÊµçÁ÷
-float Voltage2=1620;                        //ÉèÖÃµçÁ÷
-float Voltage0=0; 						     //Ìø³öµçÁ÷
-float dianliu1=0;        //¶¨Òå¸¡µã±äÁ¿	 //Êµ¼ÊµçÁ÷
-float dianliu2=0;							 //¸ú×ÙµçÁ÷
-float dianliu0=0;							 //Ìø³öµçÁ÷
-float ljt=2.08;								 //¸ú×ÙµçÁ÷ÏµÊı
-float disp_track=1.808;					 //Êµ¼ÊµçÁ÷ÏµÊı
-float setfreq=20800;						 //ÉèÖÃÆµÂÊÖµ
-float trackfreq=20800;						 //Ìø³öÆµÂÊÖµ
-float switch_track=0;						 //Ìø³öÆµÂÊÖµ
-float sl=100;								 //¸ú×ÙÇø¶ÎĞ¡
-float ml=400;								 //¸ú×ÙÇø¶ÎÖĞ
-float ll=800;								 //¸ú×ÙÇø¶Î´ó
-float sf=1;								 //¸ú×ÙÆµÂÊµ÷ÕûÖµĞ¡
-float mf=2;								 //¸ú×ÙÆµÂÊµ÷ÕûÖµÖĞ
-float lf=3;								 //¸ú×ÙÆµÂÊµ÷ÕûÖµ´ó
+float Voltage1=0;        //å®šä¹‰æµ®ç‚¹å˜é‡	 //å®é™…ç”µæµ
+float Voltage2=1620;                        //è®¾ç½®ç”µæµ
+float Voltage0=0; 						     //è·³å‡ºç”µæµ
+float dianliu1=0;        //å®šä¹‰æµ®ç‚¹å˜é‡	 //å®é™…ç”µæµ
+float dianliu2=0;							 //è·Ÿè¸ªç”µæµ
+float dianliu0=0;							 //è·³å‡ºç”µæµ
+float ljt=2.08;								 //è·Ÿè¸ªç”µæµç³»æ•°
+float disp_track=1.808;					 //å®é™…ç”µæµç³»æ•°
+float setfreq=20800;						 //è®¾ç½®é¢‘ç‡å€¼
+float trackfreq=20800;						 //è·³å‡ºé¢‘ç‡å€¼
+float switch_track=0;						 //è·³å‡ºé¢‘ç‡å€¼
+float sl=100;								 //è·Ÿè¸ªåŒºæ®µå°
+float ml=400;								 //è·Ÿè¸ªåŒºæ®µä¸­
+float ll=800;								 //è·Ÿè¸ªåŒºæ®µå¤§
+float sf=1;								 //è·Ÿè¸ªé¢‘ç‡è°ƒæ•´å€¼å°
+float mf=2;								 //è·Ÿè¸ªé¢‘ç‡è°ƒæ•´å€¼ä¸­
+float lf=3;								 //è·Ÿè¸ªé¢‘ç‡è°ƒæ•´å€¼å¤§
 float sum_dianliu1=8888;
 float sum_dianliu2=8888;
-float low_Fq=18000;								 //ãĞÖµµÍÆµ
-float high_Fq=26000;								 //ãĞÖµ¸ßÆµ
+float low_Fq=18000;								 //é˜ˆå€¼ä½é¢‘
+float high_Fq=26000;								 //é˜ˆå€¼é«˜é¢‘
 float i_dianliu;
 float iiii;
-uchar display_o;	  //ÏÔÊ¾Î»ÖÃ±êÖ¾Î»		
+uchar display_o;	  //æ˜¾ç¤ºä½ç½®æ ‡å¿—ä½		
 uchar hi_bit_xiabiao;  //display_o=1
 uchar hi_bit_xiabiao2; //display_o=2
 uchar hi_bit_xiabiao3; //display_o=3
@@ -76,7 +75,7 @@ void delay2(unsigned int a)
 
 
 /*------------------------------------------------
-              Ö÷³ÌĞò
+              ä¸»ç¨‹åº
 ------------------------------------------------*/
  void main()
 {
@@ -90,35 +89,35 @@ void delay2(unsigned int a)
 	flag=0;
 	Program_Choose=1;
 	error_IF=1;
-	init_9850();//³õÊ¼»¯	
+	init_9850();//åˆå§‹åŒ–	
 	if(Program_Choose==1)
 	{
-		display_logo();		//ÏÔÊ¾Í¼±ê	
+		display_logo();		//æ˜¾ç¤ºå›¾æ ‡	
 		display_guding();			
-		delay2(100);          //µÈ´ıÏÔÊ¾logo
+		delay2(100);          //ç­‰å¾…æ˜¾ç¤ºlogo
 	}
  
-    inde_switch0=1;	 //ÇåÁã¶Ë¿Ú
+    inde_switch0=1;	 //æ¸…é›¶ç«¯å£
 	  inde_switch1=0;
     inde_switch2=1;
     inde_switch3=1;
     inde_switch6=1;
 	inde_switch7=1;
-	while(1)					   //³ÌĞò¿ªÊ¼
+	while(1)					   //ç¨‹åºå¼€å§‹
 	{
-//		if(!kx)				//ÅĞ¶ÏÊÖ¶¯×Ô¶¯£¬ÊÖ¶¯¿ªÊ¼³ÌĞò¶Î
+//		if(!kx)				//åˆ¤æ–­æ‰‹åŠ¨è‡ªåŠ¨ï¼Œæ‰‹åŠ¨å¼€å§‹ç¨‹åºæ®µ
 //		{
 //			delay2(10);
 //			if(!kx)
 //			{
-//				dispmanual();								//3.5  ÏÔÊ¾¡°ÊÖ¶¯Ä£Ê½¡±
+//				dispmanual();								//3.5  æ˜¾ç¤ºâ€œæ‰‹åŠ¨æ¨¡å¼â€
 //				delay2(2);
-//				Frequency_Out_9850 = setfreq;		 //ÉèÖÃÊÖ¶¯³õÊ¼ÆµÂÊ
+//				Frequency_Out_9850 = setfreq;		 //è®¾ç½®æ‰‹åŠ¨åˆå§‹é¢‘ç‡
 //				Write_9850();
-//				display_blank();					 //ÏÔÊ¾Çå³ı
+//				display_blank();					 //æ˜¾ç¤ºæ¸…é™¤
 //				delay2(2);
 //				hi_bit_xiabiao=data_separation(Frequency_Out_9850);
-//				display_freq(hi_bit_xiabiao);			   //ÊÖ¶¯³ÌĞò³õÊ¼»¯END
+//				display_freq(hi_bit_xiabiao);			   //æ‰‹åŠ¨ç¨‹åºåˆå§‹åŒ–END
 //				delay2(2);
 //				dispbl100();
 //				while(1)
@@ -126,8 +125,8 @@ void delay2(unsigned int a)
 //					hi_bit_xiabiao=data_separation(Frequency_Out_9850);
 //					display_freq(hi_bit_xiabiao);
 //				
-//				  	num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
-//	                Voltage1=(float)num1*5*1000/256;   //¸ù¾İ²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û×ª»»³É¸¡µãĞÍ
+//				  	num1=ReadADC(0);      //è¯»å–ç¬¬1è·¯ç”µå‹å€¼ï¼ŒèŒƒå›´æ˜¯0-255
+//	                Voltage1=(float)num1*5*1000/256;   //æ ¹æ®å‚è€ƒç”µæºVREFç®—å‡ºæ—¶é—´ç”µå‹ï¼Œfloatæ˜¯å¼ºåˆ¶è½¬æ¢ç¬¦å·ï¼Œç”¨äºå°†ç»“æœè½¬æ¢æˆæµ®ç‚¹å‹
 //	                dianliu1=(float)disp_track*Voltage1; 
 //					sum_dianliu1=dianliu1;
 //					delay2(2);	
@@ -158,7 +157,7 @@ void delay2(unsigned int a)
 //							while(!bj);	
 //						}	
 //					}
-//					if(sw_iden(2))	               //°´¼üµ÷½Ú¼Ó¼õÆµÂÊ
+//					if(sw_iden(2))	               //æŒ‰é”®è°ƒèŠ‚åŠ å‡é¢‘ç‡
 //					{
 //						if(flag==0) {Frequency_Out_9850+=100;delay2(2);   dispstep100_inc();dispbl100();}
 //						if(flag==1) {Frequency_Out_9850+=10;delay2(2);	dispstep10_inc();dispbl10();}
@@ -183,7 +182,7 @@ void delay2(unsigned int a)
 //						delay2(10);
 //						if(sp==0) {setfreq=Frequency_Out_9850;dispsetfreq();}
 //					}			 
-//					if(kx==1)				//ÅĞ¶ÏÊÇ·ñÊÖ¶¯£¬·ñÌø³ö³ÌĞò
+//					if(kx==1)				//åˆ¤æ–­æ˜¯å¦æ‰‹åŠ¨ï¼Œå¦è·³å‡ºç¨‹åº
 //					{														//9
 //						delay2(10);
 //						if(kx==1)
@@ -196,32 +195,32 @@ void delay2(unsigned int a)
 //		}   																 //1
 	  
 	//***************************************************************************************************************************************************************************************************
-	//×Ô¶¯³ÌĞò¿ªÊ¼
-		//if(kx==1)			   //ÅĞ¶ÏÊÖ¶¯×Ô¶¯£¬×Ô¶¯¿ªÊ¼³ÌĞò¶Î
+	//è‡ªåŠ¨ç¨‹åºå¼€å§‹
+		//if(kx==1)			   //åˆ¤æ–­æ‰‹åŠ¨è‡ªåŠ¨ï¼Œè‡ªåŠ¨å¼€å§‹ç¨‹åºæ®µ
 		//{
 			//delay2(10);
 			//if(kx==1) 
 			//{  
-				while(1)					   //***********************************************************************×Ô¶¯³ÌĞò´óÑ­»·
+				while(1)					   //***********************************************************************è‡ªåŠ¨ç¨‹åºå¤§å¾ªç¯
 				{
-					Frequency_Out_9850 = setfreq;		//ÉèÖÃÉ¨Æµ³õÊ¼ÆµÂÊ
+					Frequency_Out_9850 = setfreq;		//è®¾ç½®æ‰«é¢‘åˆå§‹é¢‘ç‡
 					Write_9850();
-					display_blank1();   //ÏÔÊ¾¿Õ°×
+					display_blank1();   //æ˜¾ç¤ºç©ºç™½
 					iiii=5;
 					while(iiii)
 					{
 						hi_bit_xiabiao=data_separation(Frequency_Out_9850);
 						display_freq(hi_bit_xiabiao);	
 						delay2(2);									   
-						num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
-						Voltage1=(float)num1*5*1000/256;   //¸ù¾İ²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û×ª»»³É¸¡µãĞÍ
+						num1=ReadADC(0);      //è¯»å–ç¬¬1è·¯ç”µå‹å€¼ï¼ŒèŒƒå›´æ˜¯0-255
+						Voltage1=(float)num1*5*1000/256;   //æ ¹æ®å‚è€ƒç”µæºVREFç®—å‡ºæ—¶é—´ç”µå‹ï¼Œfloatæ˜¯å¼ºåˆ¶è½¬æ¢ç¬¦å·ï¼Œç”¨äºå°†ç»“æœè½¬æ¢æˆæµ®ç‚¹å‹
 						dianliu1=(float)disp_track*Voltage1;
 						hi_bit_xiabiao2=data_separation(dianliu1);
 						display_freq2(hi_bit_xiabiao2);
 						delay2(2);	
 						
 						num2=ReadADC(2);
-						Voltage2=(float)num2*5*1000/256;  //ÉèÖÃµçÁ÷
+						Voltage2=(float)num2*5*1000/256;  //è®¾ç½®ç”µæµ
 						dianliu2=(float)ljt*Voltage2; 						    
 						hi_bit_xiabiao3=data_separation(dianliu2);                           
 						display_freq3(hi_bit_xiabiao3);
@@ -229,14 +228,14 @@ void delay2(unsigned int a)
 						iiii-=1;
 					}
 					
-					while(!switch_track)					   //**************************************************************É¨ÆµÑ­»·
+					while(!switch_track)					   //**************************************************************æ‰«é¢‘å¾ªç¯
 					{
-						if(dy==0)				  //ÅĞ¶Ï³¬ÉùÊÇ·ñ´ò¿ª£¬´ò¿ªºóÖ´ĞĞ
+						if(dy==0)				  //åˆ¤æ–­è¶…å£°æ˜¯å¦æ‰“å¼€ï¼Œæ‰“å¼€åæ‰§è¡Œ
 						{
 							delay2(5);
 							if(dy==0) 
 							{ 
-								dispscanfre();				  //ÏÔÊ¾É¨ÆµÖĞ
+								dispscanfre();				  //æ˜¾ç¤ºæ‰«é¢‘ä¸­
 								delay2(2);
 								Voltage0=0.85*Voltage2;
 								dianliu0=(float)ljt*Voltage0;
@@ -249,21 +248,21 @@ void delay2(unsigned int a)
 								display_freq(hi_bit_xiabiao);	
 								delay2(2);
 								
-								num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
-								Voltage1=(float)num1*5*1000/256;   //¸ù¾İ²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û×ª»»³É¸¡µãĞÍ
+								num1=ReadADC(0);      //è¯»å–ç¬¬1è·¯ç”µå‹å€¼ï¼ŒèŒƒå›´æ˜¯0-255
+								Voltage1=(float)num1*5*1000/256;   //æ ¹æ®å‚è€ƒç”µæºVREFç®—å‡ºæ—¶é—´ç”µå‹ï¼Œfloatæ˜¯å¼ºåˆ¶è½¬æ¢ç¬¦å·ï¼Œç”¨äºå°†ç»“æœè½¬æ¢æˆæµ®ç‚¹å‹
 								dianliu1=(float)disp_track*Voltage1;
 								hi_bit_xiabiao2=data_separation(dianliu1);
 								display_freq2(hi_bit_xiabiao2);
 								delay2(2);	
 								
 								num2=ReadADC(2);
-								Voltage2=(float)num2*5*1000/256;  //ÉèÖÃµçÁ÷
+								Voltage2=(float)num2*5*1000/256;  //è®¾ç½®ç”µæµ
 								dianliu2=(float)ljt*Voltage2; 						    
 								hi_bit_xiabiao3=data_separation(dianliu2);                           
 								display_freq3(hi_bit_xiabiao3);
 								delay2(2);
 								
-//								if(kx==0)			  //ÅĞ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌĞò
+//								if(kx==0)			  //åˆ¤æ–­æ˜¯å¦è‡ªåŠ¨ï¼Œå¦è·³å‡ºç¨‹åº
 //								{
 //									delay2(10);
 //									if(kx==0) break;
@@ -279,7 +278,7 @@ void delay2(unsigned int a)
 									  
 							}
 						}
-						if(dy==1)				   //ÅĞ¶ÏµçÔ´ÊÇ·ñ¹Ø±Õ£¬¹Ø±ÕºóÌø³ö
+						if(dy==1)				   //åˆ¤æ–­ç”µæºæ˜¯å¦å…³é—­ï¼Œå…³é—­åè·³å‡º
 						{
 							delay2(10);
 							if(dy==1) 
@@ -291,8 +290,8 @@ void delay2(unsigned int a)
 								switch_track=0;
 								delay2(2);
 								
-								num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
-								Voltage1=(float)num1*5*1000/256;   //¸ù¾İ²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û×ª»»³É¸¡µãĞÍ
+								num1=ReadADC(0);      //è¯»å–ç¬¬1è·¯ç”µå‹å€¼ï¼ŒèŒƒå›´æ˜¯0-255
+								Voltage1=(float)num1*5*1000/256;   //æ ¹æ®å‚è€ƒç”µæºVREFç®—å‡ºæ—¶é—´ç”µå‹ï¼Œfloatæ˜¯å¼ºåˆ¶è½¬æ¢ç¬¦å·ï¼Œç”¨äºå°†ç»“æœè½¬æ¢æˆæµ®ç‚¹å‹
 								dianliu1=(float)disp_track*Voltage1; 
 								delay2(2);	
 									  	
@@ -307,30 +306,30 @@ void delay2(unsigned int a)
                                 display_freq3(hi_bit_xiabiao3);
 							}
 						}
-//						if(kx==0)			  //ÅĞ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌĞò
+//						if(kx==0)			  //åˆ¤æ–­æ˜¯å¦è‡ªåŠ¨ï¼Œå¦è·³å‡ºç¨‹åº
 //						{
 //							delay2(10);
 //							if(kx==0) break;
 //						}
 							   
-					}		 //***********************************************É¨ÆµÑ­»·½áÊø
-			   //***************************************************************************************************¸ú×ÙÑ­»·¿ªÊ¼
-                  	while(switch_track)						 //µçÁ÷¸ú×Ù¿ªÊ¼
+					}		 //***********************************************æ‰«é¢‘å¾ªç¯ç»“æŸ
+			   //***************************************************************************************************è·Ÿè¸ªå¾ªç¯å¼€å§‹
+                  	while(switch_track)						 //ç”µæµè·Ÿè¸ªå¼€å§‹
 					{
 						display_blank1();
-						if(dy==0)			 //ÅĞ¶ÏµçÔ´ÊÇ·ñ´ò¿ª£¬´ò¿ªºóÖ´ĞĞ
+						if(dy==0)			 //åˆ¤æ–­ç”µæºæ˜¯å¦æ‰“å¼€ï¼Œæ‰“å¼€åæ‰§è¡Œ
          	  			{
 							dispworking();
 							while(1)
 							{
-								hi_bit_xiabiao=data_separation(Frequency_Out_9850);		  //ÏÔÊ¾ÆµÂÊ
+								hi_bit_xiabiao=data_separation(Frequency_Out_9850);		  //æ˜¾ç¤ºé¢‘ç‡
 								delay2(2);
 								display_freq(hi_bit_xiabiao);
 								i_dianliu=5;
 								while(i_dianliu)
 								{
-									num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
-									Voltage1=(float)num1*5*1000/256;   //¸ù¾İ²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û×ª»»³É¸¡µãĞÍ
+									num1=ReadADC(0);      //è¯»å–ç¬¬1è·¯ç”µå‹å€¼ï¼ŒèŒƒå›´æ˜¯0-255
+									Voltage1=(float)num1*5*1000/256;   //æ ¹æ®å‚è€ƒç”µæºVREFç®—å‡ºæ—¶é—´ç”µå‹ï¼Œfloatæ˜¯å¼ºåˆ¶è½¬æ¢ç¬¦å·ï¼Œç”¨äºå°†ç»“æœè½¬æ¢æˆæµ®ç‚¹å‹
 									dianliu1=(float)disp_track*Voltage1; 
 									sum_dianliu1+=dianliu1;
 									delay2(1);	
@@ -351,14 +350,14 @@ void delay2(unsigned int a)
 								display_freq3(hi_bit_xiabiao3);
 //								if((sum_dianliu1>sum_dianliu2+20)&&(sum_dianliu1<sum_dianliu2+sl))
 //								{
-//									Frequency_Out_9850+=sf;		  //¼ÓÆµÂÊ½ø¸øÁ¿
+//									Frequency_Out_9850+=sf;		  //åŠ é¢‘ç‡è¿›ç»™é‡
 //									Write_9850();
 //									delay2(5);
 //								}								
 								
 								if((sum_dianliu1>sum_dianliu2+sl)&&(sum_dianliu1<sum_dianliu2+ml))
 								{
-									Frequency_Out_9850+=sf;		  //¼ÓÆµÂÊ½ø¸øÁ¿
+									Frequency_Out_9850+=sf;		  //åŠ é¢‘ç‡è¿›ç»™é‡
 									Write_9850();
 									delay2(5);
 								}
@@ -411,7 +410,7 @@ void delay2(unsigned int a)
 								if(sum_dianliu1<50)
 								{
 //									delay2(10);
-//									num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
+//									num1=ReadADC(0);      //è¯»å–ç¬¬1è·¯ç”µå‹å€¼ï¼ŒèŒƒå›´æ˜¯0-255
 //									Voltage1=(float)num1*5*1000/256;
 									//if(kx==1)
 									//{
@@ -426,7 +425,7 @@ void delay2(unsigned int a)
 //									delay2(10);
 									//if(kx==1)
 									//{
-										Frequency_Out_9850 = trackfreq;		//ÉèÖÃÉ¨Æµ³õÊ¼ÆµÂÊ
+										Frequency_Out_9850 = trackfreq;		//è®¾ç½®æ‰«é¢‘åˆå§‹é¢‘ç‡
                            				Write_9850();
  										switch_track=0;
 									//}
@@ -437,14 +436,14 @@ void delay2(unsigned int a)
 //									delay2(10);
 									//if(kx==1)
 									//{
-										Frequency_Out_9850 = trackfreq;		//ÉèÖÃÉ¨Æµ³õÊ¼ÆµÂÊ
+										Frequency_Out_9850 = trackfreq;		//è®¾ç½®æ‰«é¢‘åˆå§‹é¢‘ç‡
                            				Write_9850();
 										switch_track=0;	
 									//} 
 //									else continue;
 								}
-								//if(kx==0) break;	 //ÅĞ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌĞò
-								if(dy==1)						     //ÅĞ¶ÏµçÔ´ÊÇ·ñ¹Ø±Õ£¬¹Ø±ÕºóÌø³ö
+								//if(kx==0) break;	 //åˆ¤æ–­æ˜¯å¦è‡ªåŠ¨ï¼Œå¦è·³å‡ºç¨‹åº
+								if(dy==1)						     //åˆ¤æ–­ç”µæºæ˜¯å¦å…³é—­ï¼Œå…³é—­åè·³å‡º
 								{
 									dispoutwork();
 									switch_track=0;
@@ -453,43 +452,43 @@ void delay2(unsigned int a)
 								}
 							}		
 						}
-						if(dy==1)						     //ÅĞ¶ÏµçÔ´ÊÇ·ñ¹Ø±Õ£¬¹Ø±ÕºóÌø³ö
+						if(dy==1)						     //åˆ¤æ–­ç”µæºæ˜¯å¦å…³é—­ï¼Œå…³é—­åè·³å‡º
 						{
 							dispoutwork();
 							switch_track=0;
 							while(dy);
 							break;
 						}
-						//if(kx==0) break;						     //ÅĞ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌĞò
-					} //************************************************************************************¸ú×ÙÑ­»·½áÊø
-					//if(kx==0) break;						     //ÅĞ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌĞò
-				}//**********************************************************************×Ô¶¯´óÑ­»·½áÊø
-			//}				  //×Ô¶¯if
-		//}				  //×Ô¶¯if½áÊø
+						//if(kx==0) break;						     //åˆ¤æ–­æ˜¯å¦è‡ªåŠ¨ï¼Œå¦è·³å‡ºç¨‹åº
+					} //************************************************************************************è·Ÿè¸ªå¾ªç¯ç»“æŸ
+					//if(kx==0) break;						     //åˆ¤æ–­æ˜¯å¦è‡ªåŠ¨ï¼Œå¦è·³å‡ºç¨‹åº
+				}//**********************************************************************è‡ªåŠ¨å¤§å¾ªç¯ç»“æŸ
+			//}				  //è‡ªåŠ¨if
+		//}				  //è‡ªåŠ¨ifç»“æŸ
 	}
-}//************************************************È«²¿Ñ­»·½áÊø
+}//************************************************å…¨éƒ¨å¾ªç¯ç»“æŸ
 
 
 
  
 /*------------------------------------------------
-             ¶ÁAD×ªÖµ³ÌĞò
-ÊäÈë²ÎÊı Chl ±íÊ¾ĞèÒª×ª»»µÄÍ¨µÀ£¬·¶Î§´Ó0-3
-·µ»ØÖµ·¶Î§0-255
+             è¯»ADè½¬å€¼ç¨‹åº
+è¾“å…¥å‚æ•° Chl è¡¨ç¤ºéœ€è¦è½¬æ¢çš„é€šé“ï¼ŒèŒƒå›´ä»0-3
+è¿”å›å€¼èŒƒå›´0-255
 ------------------------------------------------*/
 unsigned char ReadADC(unsigned char Chl)
 {
 	unsigned char Val;
-	Start_I2c();               //Æô¶¯×ÜÏß
-	SendByte(AddWr);             //·¢ËÍÆ÷¼şµØÖ·
+	Start_I2c();               //å¯åŠ¨æ€»çº¿
+	SendByte(AddWr);             //å‘é€å™¨ä»¶åœ°å€
 	if(ack==0)return(0);
-	SendByte(0x40|Chl);            //·¢ËÍÆ÷¼ş×ÓµØÖ·
+	SendByte(0x40|Chl);            //å‘é€å™¨ä»¶å­åœ°å€
 	if(ack==0)return(0);
 	Start_I2c();
 	SendByte(AddWr+1);
 	if(ack==0)return(0);
 	Val=RcvByte();
-	NoAck_I2c();                 //·¢ËÍ·ÇÓ¦Î»
-	Stop_I2c();                  //½áÊø×ÜÏß
+	NoAck_I2c();                 //å‘é€éåº”ä½
+	Stop_I2c();                  //ç»“æŸæ€»çº¿
 	return(Val);
 }
