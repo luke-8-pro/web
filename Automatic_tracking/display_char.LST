@@ -1,0 +1,558 @@
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE DISPLAY_CHAR
+OBJECT MODULE PLACED IN display_char.OBJ
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_v5\C51\BIN\C51.EXE display_char.c LARGE OPTIMIZE(8,SPEED) BROWSE DEBUG 
+                    -OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          #include<reg52.h>
+   2          #include<string.h>
+   3          #include <intrins.h>
+   4          #include "12864.h"
+   5          #include "display_char.h"
+   6          
+   7          extern unsigned char data_sepa[8];
+   8          
+   9          uchar code logo[]={"大连理工大学"}; 
+  10          uchar code welcome[]={"现代制造技术"};
+  11          uchar code welcome2[]={"研究所      "}; 
+  12          uchar code outfre[]={"频率:"};  
+  13          uchar code shuzi[]={"0123456789 "};
+  14          uchar code out2[]={"设置电流:"};
+  15          uchar code out3[]={"实际电流:"};
+  16          uchar code out4[]={"扫频中请稍后"};
+  17          uchar code out5[]={"工作中        "};
+  18          uchar code out6[]={"未工作        "};
+  19          uchar code out7[]={"频率设定成功"};
+  20          uchar code out8[]={"      "};
+  21          uchar code out9[]={"手动模式    "};   
+  22          //uchar code freq_unit[]={"Unit:Hz"}; 
+  23          uchar code step1_inc[]={"步进: + 1 Hz"};  
+  24          uchar code step1_dec[]={"步进: - 1 Hz"};
+  25          uchar code step10_inc[]={"步进: +10 Hz"}; 
+  26          uchar code step10_dec[]={"步进: -10 Hz"}; 
+  27          uchar code step100_inc[]={"步进: +100Hz"};  
+  28          uchar code step100_dec[]={"步进: -100Hz"};
+  29          uchar code bl1[]={"01"};
+  30          uchar code bl10[]={"02"};
+  31          uchar code bl100[]={"03"};
+  32          uchar code jx0[]={" 0"};
+  33          uchar code jx1[]={" 1"};
+  34          uchar code step_error_I[]={"电流低"};
+  35          uchar code step_error_F[]={"超频率"};
+  36          uchar code step_empty[]={"Step:empty      "};
+  37          uchar code wait[]={"Scan Freq       "}; 
+  38          
+  39          
+  40          uchar code space8[]={"        "}; 
+  41          uchar code space9[]={"         "};  
+  42          uchar code space16[]={"                "};
+  43          uchar code step[]={"Step:"};
+  44          uchar code space1[]={" "};    
+  45          uchar code Hz[]={"Hz"}; 
+  46          uchar code poit[]={"."};
+  47          uchar code poit1[]={"0."};
+  48          uchar code zero[]={"0"};
+  49          uchar code zero6[]={"000000"};
+  50          uchar code K[]={"K"};
+  51          uchar code M[]={"M"};
+  52          uchar code A[]={"A "};
+  53          uchar code mA[]={"mA "};
+  54          uchar code maohao[]={":"};    
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 2   
+
+  55          
+  56          
+  57          void display_logo(void)
+  58          {
+  59   1        int  i=0,j=0,k=0;
+  60   1        lcd_init();       
+  61   1        delay(10);
+  62   1        
+  63   1        lcd_pos(0,1); 
+  64   1      
+  65   1        while(i!=12)    
+  66   1        {
+  67   2          lcd_wdat(logo[i]);
+  68   2          i++;
+  69   2          delay(5); 
+  70   2        }
+  71   1        delay(10);  
+  72   1        lcd_pos(1,1); 
+  73   1        while(j!=12)
+  74   1        {
+  75   2          lcd_wdat(welcome[j]);
+  76   2          j++;
+  77   2          delay(5);
+  78   2        }
+  79   1        delay(10);
+  80   1        
+  81   1        lcd_pos(2,2); 
+  82   1        while(k!=6)
+  83   1        {
+  84   2          lcd_wdat(welcome2[k]);
+  85   2          k++;
+  86   2          delay(5);
+  87   2        }
+  88   1        ClrScreen();
+  89   1        delay(10);  
+  90   1      }
+  91          
+  92          void display_guding(void)
+  93          {
+  94   1        {
+  95   2        int  i=0;
+  96   2        lcd_pos(2,0); 
+  97   2        while(i!=6)
+  98   2        {
+  99   3          lcd_wdat(outfre[i]);
+ 100   3          i++;
+ 101   3         }
+ 102   2        }
+ 103   1        {
+ 104   2        int  j=0;
+ 105   2        lcd_pos(0,0); 
+ 106   2        while(j!=10)
+ 107   2        {
+ 108   3          lcd_wdat(out2[j]);
+ 109   3          j++;
+ 110   3         }
+ 111   2        }{
+ 112   2        int  k=0;
+ 113   2      
+ 114   2        lcd_pos(1,0); 
+ 115   2        while(k!=10)
+ 116   2        {
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 3   
+
+ 117   3          lcd_wdat(out3[k]);
+ 118   3          k++;
+ 119   3         }
+ 120   2        }
+ 121   1      }
+ 122          
+ 123          
+ 124          void display_blank(void)   //先设置为第四行清零
+ 125          {
+ 126   1        int  i=0;
+ 127   1        
+ 128   1        lcd_pos(3,0); 
+ 129   1        i=0;
+ 130   1        while(i!=16)
+ 131   1        {
+ 132   2          lcd_wdat(space16[i]);
+ 133   2          i++;
+ 134   2        }
+ 135   1      }
+ 136          
+ 137          void display_blank1(void)  //先设置为第四行清零
+ 138          {
+ 139   1        int  i=0;
+ 140   1        
+ 141   1        lcd_pos(3,0); 
+ 142   1        i=0;
+ 143   1        while(i!=16)
+ 144   1        {
+ 145   2          lcd_wdat(space16[i]);
+ 146   2          i++;
+ 147   2        }
+ 148   1      }
+ 149          
+ 150          void ClrScreen()
+ 151          { 
+ 152   1         lcd_wcmd(0x01);
+ 153   1         delay(4);
+ 154   1      }
+ 155          
+ 156          void dispstep1_inc(void)
+ 157          {
+ 158   1      
+ 159   1        uchar i;
+ 160   1        lcd_pos(3,0); 
+ 161   1        i=0;
+ 162   1        while(i!=12)
+ 163   1        {
+ 164   2          lcd_wdat(step1_inc[i]);
+ 165   2          i++;
+ 166   2          delay(1);
+ 167   2          
+ 168   2        }
+ 169   1      }
+ 170          
+ 171          void dispstep1_dec(void)
+ 172          { 
+ 173   1        uchar i;
+ 174   1        lcd_pos(3,0); 
+ 175   1        i=0;
+ 176   1        while(i!=12)
+ 177   1        {
+ 178   2          lcd_wdat(step1_dec[i]);
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 4   
+
+ 179   2          i++;
+ 180   2          delay(1);
+ 181   2          
+ 182   2        }
+ 183   1      }
+ 184          void dispstep10_inc(void)
+ 185          {
+ 186   1      
+ 187   1        uchar i;
+ 188   1        lcd_pos(3,0); 
+ 189   1        i=0;
+ 190   1        while(i!=12)
+ 191   1        {
+ 192   2          lcd_wdat(step10_inc[i]);
+ 193   2          i++;
+ 194   2          delay(1);
+ 195   2          
+ 196   2        }
+ 197   1      }
+ 198          
+ 199          void dispstep10_dec(void)
+ 200          { 
+ 201   1        uchar i;
+ 202   1        lcd_pos(3,0); 
+ 203   1        i=0;
+ 204   1        while(i!=12)
+ 205   1        {
+ 206   2          lcd_wdat(step10_dec[i]);
+ 207   2          i++;
+ 208   2          delay(1);
+ 209   2          
+ 210   2        }
+ 211   1      }
+ 212          void dispstep100_inc(void)
+ 213          {
+ 214   1      
+ 215   1        uchar i;
+ 216   1        lcd_pos(3,0); 
+ 217   1        i=0;
+ 218   1        while(i!=12)
+ 219   1        {
+ 220   2          lcd_wdat(step100_inc[i]);
+ 221   2          i++;
+ 222   2          delay(1);
+ 223   2          
+ 224   2        }
+ 225   1      }
+ 226          
+ 227          void dispstep100_dec(void)
+ 228          { 
+ 229   1        uchar i;
+ 230   1        lcd_pos(3,0); 
+ 231   1        i=0;
+ 232   1        while(i!=12)
+ 233   1        {
+ 234   2          lcd_wdat(step100_dec[i]);
+ 235   2          i++;
+ 236   2          delay(1);
+ 237   2          
+ 238   2        }
+ 239   1      }
+ 240          void dispbl1(void)
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 5   
+
+ 241          {
+ 242   1        uchar i;
+ 243   1        lcd_pos(3,6);
+ 244   1        i=0;
+ 245   1        while(i!=2)
+ 246   1        {
+ 247   2          lcd_wdat(bl1[i]);
+ 248   2          i++;
+ 249   2          delay(1);
+ 250   2        }
+ 251   1      }
+ 252          void dispbl10(void)
+ 253          {
+ 254   1        uchar i;
+ 255   1        lcd_pos(3,6);
+ 256   1        i=0;
+ 257   1        while(i!=2)
+ 258   1        {
+ 259   2          lcd_wdat(bl10[i]);
+ 260   2          i++;
+ 261   2          delay(1);
+ 262   2        }
+ 263   1      }
+ 264          void dispbl100(void)
+ 265          {
+ 266   1        uchar i;
+ 267   1        lcd_pos(3,6);
+ 268   1        i=0;
+ 269   1        while(i!=2)
+ 270   1        {
+ 271   2          lcd_wdat(bl100[i]);
+ 272   2          i++;
+ 273   2          delay(1);
+ 274   2        }
+ 275   1      }
+ 276          void dispjx0(void)
+ 277          {
+ 278   1        uchar i;
+ 279   1        lcd_pos(3,7);
+ 280   1        i=0;
+ 281   1        while(i!=2)
+ 282   1        {
+ 283   2          lcd_wdat(jx0[i]);
+ 284   2          i++;
+ 285   2          delay(1);
+ 286   2        }
+ 287   1      }
+ 288          void dispjx1(void)
+ 289          {
+ 290   1        uchar i;
+ 291   1        lcd_pos(3,7);
+ 292   1        i=0;
+ 293   1        while(i!=2)
+ 294   1        {
+ 295   2          lcd_wdat(jx1[i]);
+ 296   2          i++;
+ 297   2          delay(1);
+ 298   2        }
+ 299   1      } 
+ 300          void disperror_I(void)
+ 301          {
+ 302   1        uchar i;
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 6   
+
+ 303   1        lcd_pos(3,0);
+ 304   1        i=0;
+ 305   1        while(i!=6)
+ 306   1        {
+ 307   2          lcd_wdat(step_error_I[i]);
+ 308   2          i++;
+ 309   2          delay(1);
+ 310   2        }
+ 311   1      }
+ 312          void disperror_F(void)
+ 313          {
+ 314   1        uchar i;
+ 315   1        lcd_pos(3,4);
+ 316   1        i=0;
+ 317   1        while(i!=6)
+ 318   1        {
+ 319   2          lcd_wdat(step_error_F[i]);
+ 320   2          i++;
+ 321   2          delay(1);
+ 322   2        }
+ 323   1      } 
+ 324          void dispworking(void)
+ 325          { 
+ 326   1        uchar i;
+ 327   1        lcd_pos(3,0); 
+ 328   1        i=0;
+ 329   1        while(i!=12)
+ 330   1        {
+ 331   2          lcd_wdat(out5[i]);
+ 332   2          i++;
+ 333   2        }
+ 334   1      }
+ 335          
+ 336          void dispscanfre(void)
+ 337          { 
+ 338   1        uchar i;
+ 339   1        lcd_pos(3,0); 
+ 340   1        i=0;
+ 341   1        while(i!=12)
+ 342   1        {
+ 343   2          lcd_wdat(out4[i]);
+ 344   2          i++;
+ 345   2        }
+ 346   1      }
+ 347          void dispsetfreq(void)
+ 348          { 
+ 349   1        uchar i;
+ 350   1        lcd_pos(3,0); 
+ 351   1        i=0;
+ 352   1        while(i!=12)
+ 353   1        {
+ 354   2          lcd_wdat(out7[i]);
+ 355   2          i++;    
+ 356   2        }
+ 357   1      }
+ 358          void dispoutwork(void)
+ 359          { 
+ 360   1        uchar i;
+ 361   1        lcd_pos(3,0); 
+ 362   1        i=0;
+ 363   1        while(i!=12)
+ 364   1        {
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 7   
+
+ 365   2          lcd_wdat(out6[i]);
+ 366   2          i++;
+ 367   2        }
+ 368   1      }
+ 369           void dispmanual(void)
+ 370          { 
+ 371   1        uchar i;
+ 372   1        lcd_pos(3,0); 
+ 373   1        i=0;
+ 374   1        while(i!=12)
+ 375   1        {
+ 376   2          lcd_wdat(out9[i]);
+ 377   2          i++;
+ 378   2        }
+ 379   1      }
+ 380          
+ 381          
+ 382          void display_freq2(uchar hi_bit_xiabiao2) //实际电流
+ 383          {   
+ 384   1        display_guding(); 
+ 385   1        if(hi_bit_xiabiao2<=2)   //2位
+ 386   1        {
+ 387   2          lcd_pos(1,5);
+ 388   2          lcd_wdat(space1[0]);
+ 389   2          lcd_wdat(space1[0]);  
+ 390   2          while(hi_bit_xiabiao2!=0)
+ 391   2          {
+ 392   3      
+ 393   3              lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao2-1]]);  
+ 394   3            hi_bit_xiabiao2--;  
+ 395   3          }
+ 396   2          lcd_pos(1,7);
+ 397   2          lcd_wdat(mA[0]);lcd_wdat(mA[1]);  
+ 398   2        }
+ 399   1        if(hi_bit_xiabiao2==3)      //3位
+ 400   1        {
+ 401   2          lcd_pos(1,5);
+ 402   2          lcd_wdat(space1[0]);
+ 403   2          while(hi_bit_xiabiao2!=0)
+ 404   2          {
+ 405   3            lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao2-1]]);  
+ 406   3            hi_bit_xiabiao2--;
+ 407   3          }
+ 408   2          lcd_pos(1,7);
+ 409   2          lcd_wdat(mA[0]);lcd_wdat(mA[1]);
+ 410   2        }
+ 411   1        if(hi_bit_xiabiao2==4)      //4位
+ 412   1        {
+ 413   2          lcd_pos(1,5);
+ 414   2          while(hi_bit_xiabiao2!=0)
+ 415   2          {
+ 416   3            lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao2-1]]);  
+ 417   3            hi_bit_xiabiao2--;
+ 418   3          }
+ 419   2          lcd_pos(1,7);
+ 420   2          lcd_wdat(mA[0]);lcd_wdat(mA[1]);
+ 421   2        }
+ 422   1      }
+ 423          
+ 424          void display_freq3(uchar hi_bit_xiabiao3)//设置电流
+ 425          {   
+ 426   1        display_guding(); 
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 8   
+
+ 427   1        if(hi_bit_xiabiao3<=2)   //2位
+ 428   1        {
+ 429   2          lcd_pos(0,5);
+ 430   2          lcd_wdat(space1[0]);
+ 431   2          lcd_wdat(space1[0]);  
+ 432   2          while(hi_bit_xiabiao3!=0)
+ 433   2          {
+ 434   3      
+ 435   3              lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao3-1]]);  
+ 436   3            hi_bit_xiabiao3--;  
+ 437   3          }
+ 438   2          lcd_pos(0,7);
+ 439   2          lcd_wdat(mA[0]);lcd_wdat(mA[1]);  
+ 440   2        }
+ 441   1        if(hi_bit_xiabiao3==3)      //3位
+ 442   1        {
+ 443   2          lcd_pos(0,5);
+ 444   2          lcd_wdat(space1[0]);
+ 445   2          while(hi_bit_xiabiao3!=0)
+ 446   2          {
+ 447   3            lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao3-1]]);  
+ 448   3            hi_bit_xiabiao3--;
+ 449   3          }
+ 450   2          lcd_pos(0,7);
+ 451   2          lcd_wdat(mA[0]);lcd_wdat(mA[1]);
+ 452   2        }
+ 453   1        if(hi_bit_xiabiao3==4)      //4位
+ 454   1        {
+ 455   2          lcd_pos(0,5);
+ 456   2          while(hi_bit_xiabiao3!=0)
+ 457   2          {
+ 458   3            lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao3-1]]);  
+ 459   3            hi_bit_xiabiao3--;
+ 460   3          }
+ 461   2          lcd_pos(0,7);
+ 462   2          lcd_wdat(mA[0]);lcd_wdat(mA[1]);
+ 463   2        }
+ 464   1      }
+ 465          void display_freq(uchar hi_bit_xiabiao)//频率
+ 466          {   
+ 467   1        display_guding(); 
+ 468   1        if(hi_bit_xiabiao<=2)  //2位
+ 469   1        {
+ 470   2          lcd_pos(2,5);
+ 471   2          lcd_wdat(space1[0]);
+ 472   2          lcd_wdat(space1[0]);  
+ 473   2          while(hi_bit_xiabiao!=0)
+ 474   2          {
+ 475   3      
+ 476   3              lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao-1]]); 
+ 477   3            hi_bit_xiabiao--; 
+ 478   3          }
+ 479   2          lcd_pos(2,7);
+ 480   2          lcd_wdat(Hz[0]);lcd_wdat(Hz[1]);  
+ 481   2        }
+ 482   1        if(hi_bit_xiabiao==3)     //3位
+ 483   1        {
+ 484   2          lcd_pos(2,5);
+ 485   2          lcd_wdat(space1[0]);
+ 486   2          while(hi_bit_xiabiao!=0)
+ 487   2          {
+ 488   3            lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao-1]]); 
+C51 COMPILER V9.54   DISPLAY_CHAR                                                          06/07/2022 16:15:34 PAGE 9   
+
+ 489   3            hi_bit_xiabiao--;
+ 490   3          }
+ 491   2          lcd_pos(2,7);
+ 492   2          lcd_wdat(Hz[0]);lcd_wdat(Hz[1]);
+ 493   2        }
+ 494   1        if(hi_bit_xiabiao==4)     //4位
+ 495   1        {
+ 496   2          lcd_pos(2,5);
+ 497   2          while(hi_bit_xiabiao!=0)
+ 498   2          {
+ 499   3            lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao-1]]); 
+ 500   3            hi_bit_xiabiao--;
+ 501   3          }
+ 502   2          lcd_pos(2,7);
+ 503   2          lcd_wdat(Hz[0]);lcd_wdat(Hz[1]);
+ 504   2        }
+ 505   1        if(hi_bit_xiabiao==5)     //5位
+ 506   1        {
+ 507   2          lcd_pos(2,4);
+ 508   2          lcd_wdat(space1[0]);
+ 509   2          while(hi_bit_xiabiao!=0)
+ 510   2          {
+ 511   3            lcd_wdat(shuzi[data_sepa[hi_bit_xiabiao-1]]); 
+ 512   3            hi_bit_xiabiao--;
+ 513   3          }
+ 514   2          lcd_pos(2,7);
+ 515   2          lcd_wdat(Hz[0]);lcd_wdat(Hz[1]);
+ 516   2        }
+ 517   1      }
+ 518          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2175    ----
+   CONSTANT SIZE    =    368    ----
+   XDATA SIZE       =   ----      33
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

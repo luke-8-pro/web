@@ -1,0 +1,137 @@
+C51 COMPILER V9.54   12864                                                                 06/07/2022 16:15:34 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE 12864
+OBJECT MODULE PLACED IN 12864.OBJ
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_v5\C51\BIN\C51.EXE 12864.c LARGE OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTE
+                    -XTEND TABS(2)
+
+line level    source
+
+   1          #include <intrins.h>
+   2          #include <reg52.h>
+   3          #include "12864.h"
+   4            
+   5          #define LCD_data  P3             //数据口
+   6          sbit LCD_RS  =  P1^5;            //寄存器选择输入 
+   7          sbit LCD_RW  =  P1^6;            //液晶读/写控制
+   8          sbit LCD_EN  =  P1^7;            //液晶使能控制
+   9          //sbit LCD_PSB =  P0^4;            //串/并方式控制
+  10          void delay(int ms)
+  11          {
+  12   1          while(ms--)
+  13   1        {
+  14   2            uchar i;
+  15   2          for(i=0;i<250;i++)  
+  16   2           {
+  17   3            _nop_();         
+  18   3          _nop_();
+  19   3          _nop_();
+  20   3          _nop_();
+  21   3           }
+  22   2        }
+  23   1      }
+  24          
+  25          
+  26          
+  27          bit lcd_busy()
+  28           {                          
+  29   1          bit result;
+  30   1          LCD_RS = 0;
+  31   1          LCD_RW = 1;
+  32   1          LCD_EN = 1;
+  33   1          _nop_();_nop_();_nop_();_nop_();
+  34   1          result = (bit)(LCD_data&0x80);
+  35   1          LCD_EN = 0;
+  36   1          return(result); 
+  37   1       }
+  38          
+  39          
+  40          void lcd_wcmd(uchar cmd)
+  41          {                          
+  42   1         //while(lcd_busy());
+  43   1          lcd_busy();
+  44   1          LCD_RS = 0;
+  45   1          LCD_RW = 0;
+  46   1          LCD_EN = 0;
+  47   1          _nop_();
+  48   1          _nop_(); 
+  49   1          LCD_data = cmd;
+  50   1          _nop_();_nop_();_nop_();_nop_();
+  51   1          LCD_EN = 1;
+  52   1          _nop_();_nop_();_nop_();_nop_();
+  53   1          LCD_EN = 0;  
+  54   1      }
+C51 COMPILER V9.54   12864                                                                 06/07/2022 16:15:34 PAGE 2   
+
+  55          
+  56          /*********************************************************/
+  57          /*                                                       */
+  58          /* 设定显示位置                                          */
+  59          /*                                                       */
+  60          /*********************************************************/
+  61          void lcd_pos(uchar X,uchar Y)
+  62          {                          
+  63   1         uchar  pos;
+  64   1         if (X==0)
+  65   1           {X=0x80;}
+  66   1         else if (X==1)
+  67   1           {X=0x90;}
+  68   1         else if (X==2)
+  69   1           {X=0x88;}
+  70   1         else if (X==3)
+  71   1           {X=0x98;}
+  72   1         pos = X+Y ;  
+  73   1         lcd_wcmd(pos);     //显示地址
+  74   1      }
+  75          /*******************************************************************/
+  76          /*                                                                 */
+  77          /*写显示数据到LCD                                                  */
+  78          /*RS=H，RW=L，E=高脉冲，D0-D7=数据。                               */
+  79          /*                                                                 */
+  80          /*******************************************************************/
+  81          void lcd_wdat(uchar dat)
+  82          {                          
+  83   1         //while(lcd_busy());
+  84   1          lcd_busy();
+  85   1          LCD_RS = 1;
+  86   1          LCD_RW = 0;
+  87   1          LCD_EN = 0;
+  88   1          LCD_data = dat;
+  89   1          _nop_();_nop_();_nop_();_nop_();
+  90   1          LCD_EN = 1;
+  91   1          _nop_();_nop_();_nop_();_nop_();
+  92   1          LCD_EN = 0; 
+  93   1      }
+  94          void lcd_init()
+  95          { 
+  96   1      
+  97   1          //LCD_PSB = 1;         //并口方式
+  98   1          
+  99   1          lcd_wcmd(0x34);      //扩充指令操作
+ 100   1          delay(5);
+ 101   1          lcd_wcmd(0x30);      //基本指令操作
+ 102   1          delay(5);
+ 103   1          lcd_wcmd(0x0C);      //显示开，关光标
+ 104   1          delay(5);
+ 105   1          lcd_wcmd(0x01);      //清除LCD的显示内容
+ 106   1          delay(5);
+ 107   1      }
+ 108          
+ 109          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    179    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----       1
+   PDATA SIZE       =   ----    ----
+C51 COMPILER V9.54   12864                                                                 06/07/2022 16:15:34 PAGE 3   
+
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       1
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

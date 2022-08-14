@@ -1,0 +1,138 @@
+C51 COMPILER V9.54   SEND                                                                  06/07/2022 16:15:34 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE SEND
+OBJECT MODULE PLACED IN send.OBJ
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_v5\C51\BIN\C51.EXE send.c LARGE OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEX
+                    -TEND TABS(2)
+
+line level    source
+
+   1          #include<reg52.h>
+   2          #include<string.h>
+   3          
+   4          #define _READY_  0X06//主机握手信号
+   5          #define _BUSY_   0x15//从机忙应答
+   6          #define _OK_     0x00//从机准备好
+   7          #define _SUCC_   0X0F//数据传输成功
+   8          #define _ERR_    0XF0//数据传输失败
+   9          #define uchar  unsigned char
+  10          
+  11          
+  12          //unsigned char Dat[9]={0xfe,0xfd,0xfb,0xf7,0xef,0xdf,0xbf,0x7f,0xff};
+  13          //unsigned char Buff[20];//数据缓冲区
+  14          uchar temp=_BUSY_; 
+  15          uchar  lenth;
+  16          extern uchar  display_o;
+  17          
+  18          /*void delay_1ms(unsigned int t)
+  19          {
+  20           unsigned int x,y;
+  21           for(x=t;x>0;x--)
+  22            for(y=110;y>0;y--);
+  23          }
+  24          
+  25          void Buff_init(unsigned char *Dat)  //缓冲区初始化
+  26          {
+  27          unsigned char i;
+  28            for(i=0;i<9;i++)
+  29            {
+  30            Buff[i]=Dat[i];
+  31            delay_1ms(1);
+  32            }
+  33          }*/
+  34          
+  35          void usart_init() //串口初始化
+  36          {
+  37   1       TMOD=0x20;   //定时器1工作于方式2
+  38   1       TH1=0xfd;  
+  39   1       TL1=0xfd;   //波特率为9600
+  40   1       PCON=0;
+  41   1       SCON=0x50;  //串口工作于方式1
+  42   1       TR1=1;      //开启定时器
+  43   1       TI=0;
+  44   1       RI=0;
+  45   1      }
+  46          
+  47          void send_data(uchar DA[8],uchar D1)
+  48          {
+  49   1      uchar i;
+  50   1      //uchar k;
+  51   1      uchar check;
+  52   1      /*uchar long_;
+  53   1      uchar transfer[8];
+  54   1      
+C51 COMPILER V9.54   SEND                                                                  06/07/2022 16:15:34 PAGE 2   
+
+  55   1      long_=strlen(DA);
+  56   1      for(k=0;k<long_;k++)
+  57   1      {transfer[k]=DA[k]-0x30;}
+  58   1      transfer[k]='\0';*/
+  59   1      D1=display_o;
+  60   1      lenth=strlen(DA);//计算数据长度
+  61   1      check=lenth;
+  62   1      TI=0;
+  63   1      SBUF=lenth;        //发送数据长度
+  64   1      while(!TI);
+  65   1      TI=0;
+  66   1      
+  67   1        for(i=0;i<lenth;i++) //发送数据
+  68   1        {
+  69   2         check=check^(DA[i]-0X30);//校验位，^为按位异或，对数据的八位同时按位异或，相同为0，不同为1
+  70   2         SBUF=DA[i]-0X30;
+  71   2         while(!TI);
+  72   2         TI=0;
+  73   2        }
+  74   1      
+  75   1         SBUF=D1;  //发送显示标志位
+  76   1         while(!TI);
+  77   1         TI=0;
+  78   1      
+  79   1         SBUF=check;     //发送校验字节
+  80   1         while(!TI);
+  81   1         TI=0;
+  82   1      }
+  83          
+  84          void send(uchar DAT[8],uchar D2)
+  85          {
+  86   1            //Buff_init(DAT);
+  87   1            usart_init();
+  88   1              TI=0;    
+  89   1                  SBUF=_READY_;
+  90   1                  while(!TI);
+  91   1                  TI=0;
+  92   1            
+  93   1            while(temp!=_OK_)//主机等待从机应答信号
+  94   1            {
+  95   2             RI=0;
+  96   2             while(!RI);
+  97   2             temp=SBUF;
+  98   2             RI=0;
+  99   2            }
+ 100   1      
+ 101   1            temp=_ERR_ ;
+ 102   1            while(temp!=_SUCC_) //
+ 103   1            {
+ 104   2               send_data(DAT,D2);
+ 105   2                 RI=0;
+ 106   2               while(!RI);
+ 107   2               temp=SBUF;
+ 108   2               RI=0;
+ 109   2            }
+ 110   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    226    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2       8
+C51 COMPILER V9.54   SEND                                                                  06/07/2022 16:15:34 PAGE 3   
+
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,8 @@
+"main.obj",
+"i2c.obj",
+"delay.obj",
+"send.obj",
+"12864.obj",
+"display_char.obj" 
+TO "main" 
+RAMSIZE(256) 

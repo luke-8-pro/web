@@ -1,0 +1,550 @@
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 1   
+
+
+C51 COMPILER V9.54, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: D:\Program Files (x86)\Keil_v5\C51\BIN\C51.EXE main.c LARGE OPTIMIZE(8,SPEED) BROWSE DEBUG OBJECTEX
+                    -TEND TABS(2)
+
+line level    source
+
+   1          #define  uchar unsigned char
+   2          /*-----------------------------------------------
+   3            Ãû³Æ£º³¬ÉùµçÔ´¿ØÖÆ³ÌÐò
+   4            ±àÐ´£ºº«À¤
+   5            µ¥Î»£º´óÁ¬Àí¹¤´óÑ§
+   6          ------------------------------------------------*/  
+   7          #include <reg52.h>                
+   8          #include "i2c.h"
+   9          #include "delay.h"
+  10          #include "send.h"
+  11          #include <stdio.h>
+  12          #include <string.h>
+  13          
+  14          #include <ad9850.h>     
+  15          #include <12864.h>    
+  16          #include <data_separation.h>  
+  17          #include <key_iden.h>   
+  18          #include <display_char.h>
+  19          
+  20          #define AddWr 0x90   //Ð´Êý¾ÝµØÖ· 
+  21          #define AddRd 0x91   //¶ÁÊý¾ÝµØÖ·
+  22          
+  23          extern bit ack;
+  24          unsigned char ReadADC(unsigned char Chl);
+  25          bit WriteDAC(unsigned char dat);
+  26          //void Get_dianliu1_and_display();
+  27          //void Get_dianliu2_and_display();
+  28          
+  29          sbit inde_switch0=P0^4;            //ÏàÎ»¸ú×ÙÖÐÓÃ
+  30          sbit kx=P0^0;                //ÊÖ¶¯×Ô¶¯ÇÐ»»¶Ë¿Ú
+  31          sbit inde_switch4=P0^5;            //ÏàÎ»¸ú×ÙÖÐÓÃ
+  32          sbit dy=P0^7;                //ÅÐ¶ÏµçÔ´ÐÅºÅÊÇ·ñ½ÓÍ¨¶Ë¿Ú
+  33          sbit bj=P0^3;                //²½½øÑ¡Ôñ
+  34          sbit sp=P1^1;                //ÆµÂÊÉè¶¨
+  35          sbit error_IF=P1^0;              //±¨¾¯
+  36          
+  37          unsigned char num1=0,num2=0,i;
+  38          float Voltage1=0;        //¶¨Òå¸¡µã±äÁ¿  //Êµ¼ÊµçÁ÷
+  39          float Voltage2=1620;                        //ÉèÖÃµçÁ÷
+  40          float Voltage0=0;                  //Ìø³öµçÁ÷
+  41          float dianliu1=0;        //¶¨Òå¸¡µã±äÁ¿  //Êµ¼ÊµçÁ÷
+  42          float dianliu2=0;              //¸ú×ÙµçÁ÷
+  43          float dianliu0=0;              //Ìø³öµçÁ÷
+  44          float ljt=2.08;                //¸ú×ÙµçÁ÷ÏµÊý
+  45          float disp_track=1.808;          //Êµ¼ÊµçÁ÷ÏµÊý
+  46          float setfreq=20800;             //ÉèÖÃÆµÂÊÖµ
+  47          float trackfreq=20800;             //Ìø³öÆµÂÊÖµ
+  48          float switch_track=0;            //Ìø³öÆµÂÊÖµ
+  49          float sl=100;                //¸ú×ÙÇø¶ÎÐ¡
+  50          float ml=400;                //¸ú×ÙÇø¶ÎÖÐ
+  51          float ll=800;                //¸ú×ÙÇø¶Î´ó
+  52          float sf=1;                //¸ú×ÙÆµÂÊµ÷ÕûÖµÐ¡
+  53          float mf=2;                //¸ú×ÙÆµÂÊµ÷ÕûÖµÖÐ
+  54          float lf=3;                //¸ú×ÙÆµÂÊµ÷ÕûÖµ´ó
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 2   
+
+  55          float sum_dianliu1=8888;
+  56          float sum_dianliu2=8888;
+  57          float low_Fq=18000;                //ãÐÖµµÍÆµ
+  58          float high_Fq=26000;                 //ãÐÖµ¸ßÆµ
+  59          float i_dianliu;
+  60          float iiii;
+  61          uchar display_o;    //ÏÔÊ¾Î»ÖÃ±êÖ¾Î»    
+  62          uchar hi_bit_xiabiao;  //display_o=1
+  63          uchar hi_bit_xiabiao2; //display_o=2
+  64          uchar hi_bit_xiabiao3; //display_o=3
+  65          //uchar sw_flag=0;
+  66          uchar flag;
+  67          uchar Program_Choose;
+  68          void delay2(unsigned int a)
+  69          {     
+  70   1        unsigned int i;
+  71   1        while( a-- != 0)
+  72   1        {
+  73   2          for(i = 0; i < 600; i++);
+  74   2        }
+  75   1      }
+  76          
+  77          
+  78          /*------------------------------------------------
+  79                        Ö÷³ÌÐò
+  80          ------------------------------------------------*/
+  81           void main()
+  82          {
+  83   1        Voltage0=0.85*Voltage2;
+  84   1        dianliu0=(float)ljt*Voltage0;
+  85   1        Frequency_Out_9850 = setfreq;    
+  86   1          Write_9850();
+  87   1        delay2(50);
+  88   1          kx=1;
+  89   1          dy=0;
+  90   1        flag=0;
+  91   1        Program_Choose=1;
+  92   1        error_IF=1;
+  93   1        init_9850();//³õÊ¼»¯  
+  94   1        if(Program_Choose==1)
+  95   1        {
+  96   2          display_logo();   //ÏÔÊ¾Í¼±ê  
+  97   2          display_guding();     
+  98   2          delay2(100);          //µÈ´ýÏÔÊ¾logo
+  99   2        }
+ 100   1       
+ 101   1          inde_switch0=1;  //ÇåÁã¶Ë¿Ú
+ 102   1          inde_switch1=0;
+ 103   1          inde_switch2=1;
+ 104   1          inde_switch3=1;
+ 105   1          inde_switch6=1;
+ 106   1        inde_switch7=1;
+ 107   1        while(1)             //³ÌÐò¿ªÊ¼
+ 108   1        {
+ 109   2      //    if(!kx)       //ÅÐ¶ÏÊÖ¶¯×Ô¶¯£¬ÊÖ¶¯¿ªÊ¼³ÌÐò¶Î
+ 110   2      //    {
+ 111   2      //      delay2(10);
+ 112   2      //      if(!kx)
+ 113   2      //      {
+ 114   2      //        dispmanual();               //3.5  ÏÔÊ¾¡°ÊÖ¶¯Ä£Ê½¡±
+ 115   2      //        delay2(2);
+ 116   2      //        Frequency_Out_9850 = setfreq;    //ÉèÖÃÊÖ¶¯³õÊ¼ÆµÂÊ
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 3   
+
+ 117   2      //        Write_9850();
+ 118   2      //        display_blank();           //ÏÔÊ¾Çå³ý
+ 119   2      //        delay2(2);
+ 120   2      //        hi_bit_xiabiao=data_separation(Frequency_Out_9850);
+ 121   2      //        display_freq(hi_bit_xiabiao);        //ÊÖ¶¯³ÌÐò³õÊ¼»¯END
+ 122   2      //        delay2(2);
+ 123   2      //        dispbl100();
+ 124   2      //        while(1)
+ 125   2      //        {
+ 126   2      //          hi_bit_xiabiao=data_separation(Frequency_Out_9850);
+ 127   2      //          display_freq(hi_bit_xiabiao);
+ 128   2      //        
+ 129   2      //            num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
+ 130   2      //                  Voltage1=(float)num1*5*1000/256;   //¸ù¾Ý²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£
+             -¬ÓÃÓÚ½«½á¹û×ª»»³É¸¡µãÐÍ
+ 131   2      //                  dianliu1=(float)disp_track*Voltage1; 
+ 132   2      //          sum_dianliu1=dianliu1;
+ 133   2      //          delay2(2);  
+ 134   2      //              
+ 135   2      //                  num2=ReadADC(2);
+ 136   2      //                  Voltage2=(float)num2*5*1000/256;
+ 137   2      //          dianliu2=(float)ljt*Voltage2;                 
+ 138   2      //          sum_dianliu2=dianliu2;
+ 139   2      //          delay2(2);
+ 140   2      //          
+ 141   2      //          sum_dianliu1=sum_dianliu1;
+ 142   2      //          sum_dianliu2=sum_dianliu2;
+ 143   2      //          hi_bit_xiabiao2=data_separation(sum_dianliu1);
+ 144   2      //          display_freq2(hi_bit_xiabiao2);                             
+ 145   2      //          hi_bit_xiabiao3=data_separation(sum_dianliu2);                            
+ 146   2      //          display_freq3(hi_bit_xiabiao3);            
+ 147   2      //          if(!bj)
+ 148   2      //          {
+ 149   2      //            delay2(10);
+ 150   2      //            if(!bj)
+ 151   2      //            {
+ 152   2      //              switch(flag)
+ 153   2      //              {
+ 154   2      //                case 0: flag=1;dispbl10();break;
+ 155   2      //                case 1: flag=2;dispbl1();break;
+ 156   2      //                case 2: flag=0;dispbl100();break;
+ 157   2      //              }
+ 158   2      //              while(!bj); 
+ 159   2      //            } 
+ 160   2      //          }
+ 161   2      //          if(sw_iden(2))                 //°´¼üµ÷½Ú¼Ó¼õÆµÂÊ
+ 162   2      //          {
+ 163   2      //            if(flag==0) {Frequency_Out_9850+=100;delay2(2);   dispstep100_inc();dispbl100();}
+ 164   2      //            if(flag==1) {Frequency_Out_9850+=10;delay2(2);  dispstep10_inc();dispbl10();}
+ 165   2      //            if(flag==2) {Frequency_Out_9850+=1;delay2(2); dispstep1_inc();dispbl1();}
+ 166   2      //            Write_9850();
+ 167   2      //            delay2(2);
+ 168   2      //          }       
+ 169   2      //          if(sw_iden(3))  
+ 170   2      //          {
+ 171   2      //            if(flag==0) {Frequency_Out_9850-=100;delay2(2);   dispstep100_dec();dispbl100();}
+ 172   2      //            if(flag==1) {Frequency_Out_9850-=10;delay2(2);  dispstep10_dec();dispbl10();}
+ 173   2      //            if(flag==2) {Frequency_Out_9850-=1;delay2(2); dispstep1_dec();dispbl1();}
+ 174   2      //            Write_9850();
+ 175   2      //            delay2(2);
+ 176   2      //          }
+ 177   2      //          hi_bit_xiabiao=data_separation(Frequency_Out_9850); 
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 4   
+
+ 178   2      //          display_freq(hi_bit_xiabiao);
+ 179   2      //          if(inde_switch1==1) dispjx1();  
+ 180   2      //          if(inde_switch1==0) dispjx0();  
+ 181   2      //          if(sp==0)
+ 182   2      //          {
+ 183   2      //            delay2(10);
+ 184   2      //            if(sp==0) {setfreq=Frequency_Out_9850;dispsetfreq();}
+ 185   2      //          }      
+ 186   2      //          if(kx==1)       //ÅÐ¶ÏÊÇ·ñÊÖ¶¯£¬·ñÌø³ö³ÌÐò
+ 187   2      //          {                           //9
+ 188   2      //            delay2(10);
+ 189   2      //            if(kx==1)
+ 190   2      //            kx=1;
+ 191   2      //            switch_track=0; 
+ 192   2      //            break;
+ 193   2      //          }   
+ 194   2      //        }   
+ 195   2      //      } 
+ 196   2      //    }                                    //1
+ 197   2          
+ 198   2        //*******************************************************************************************************
+             -********************************************************************************************
+ 199   2        //×Ô¶¯³ÌÐò¿ªÊ¼
+ 200   2          //if(kx==1)        //ÅÐ¶ÏÊÖ¶¯×Ô¶¯£¬×Ô¶¯¿ªÊ¼³ÌÐò¶Î
+ 201   2          //{
+ 202   2            //delay2(10);
+ 203   2            //if(kx==1) 
+ 204   2            //{  
+ 205   2              while(1)             //***********************************************************************×Ô¶¯³ÌÐò´óÑ­»
+             -·
+ 206   2              {
+ 207   3                Frequency_Out_9850 = setfreq;   //ÉèÖÃÉ¨Æµ³õÊ¼ÆµÂÊ
+ 208   3                Write_9850();
+ 209   3                display_blank1();   //ÏÔÊ¾¿Õ°×
+ 210   3                iiii=5;
+ 211   3                while(iiii)
+ 212   3                {
+ 213   4                  hi_bit_xiabiao=data_separation(Frequency_Out_9850);
+ 214   4                  display_freq(hi_bit_xiabiao); 
+ 215   4                  delay2(2);                     
+ 216   4                  num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
+ 217   4                  Voltage1=(float)num1*5*1000/256;   //¸ù¾Ý²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û×ª
+             -»»³É¸¡µãÐÍ
+ 218   4                  dianliu1=(float)disp_track*Voltage1;
+ 219   4                  hi_bit_xiabiao2=data_separation(dianliu1);
+ 220   4                  display_freq2(hi_bit_xiabiao2);
+ 221   4                  delay2(2);  
+ 222   4                  
+ 223   4                  num2=ReadADC(2);
+ 224   4                  Voltage2=(float)num2*5*1000/256;  //ÉèÖÃµçÁ÷
+ 225   4                  dianliu2=(float)ljt*Voltage2;                 
+ 226   4                  hi_bit_xiabiao3=data_separation(dianliu2);                           
+ 227   4                  display_freq3(hi_bit_xiabiao3);
+ 228   4                  delay2(2);
+ 229   4                  iiii-=1;
+ 230   4                }
+ 231   3                
+ 232   3                while(!switch_track)             //**************************************************************É¨ÆµÑ­»·
+ 233   3                {
+ 234   4                  if(dy==0)         //ÅÐ¶Ï³¬ÉùÊÇ·ñ´ò¿ª£¬´ò¿ªºóÖ´ÐÐ
+ 235   4                  {
+ 236   5                    delay2(5);
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 5   
+
+ 237   5                    if(dy==0) 
+ 238   5                    { 
+ 239   6                      dispscanfre();          //ÏÔÊ¾É¨ÆµÖÐ
+ 240   6                      delay2(2);
+ 241   6                      Voltage0=0.85*Voltage2;
+ 242   6                      dianliu0=(float)ljt*Voltage0;
+ 243   6                      if(dianliu1<1000) Frequency_Out_9850-=30;
+ 244   6                      else Frequency_Out_9850-=3;
+ 245   6                      if(Frequency_Out_9850<low_Fq)
+ 246   6                        Frequency_Out_9850=high_Fq;
+ 247   6                      Write_9850();
+ 248   6                      hi_bit_xiabiao=data_separation(Frequency_Out_9850);
+ 249   6                      display_freq(hi_bit_xiabiao); 
+ 250   6                      delay2(2);
+ 251   6                      
+ 252   6                      num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
+ 253   6                      Voltage1=(float)num1*5*1000/256;   //¸ù¾Ý²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û
+             -×ª»»³É¸¡µãÐÍ
+ 254   6                      dianliu1=(float)disp_track*Voltage1;
+ 255   6                      hi_bit_xiabiao2=data_separation(dianliu1);
+ 256   6                      display_freq2(hi_bit_xiabiao2);
+ 257   6                      delay2(2);  
+ 258   6                      
+ 259   6                      num2=ReadADC(2);
+ 260   6                      Voltage2=(float)num2*5*1000/256;  //ÉèÖÃµçÁ÷
+ 261   6                      dianliu2=(float)ljt*Voltage2;                 
+ 262   6                      hi_bit_xiabiao3=data_separation(dianliu2);                           
+ 263   6                      display_freq3(hi_bit_xiabiao3);
+ 264   6                      delay2(2);
+ 265   6                      
+ 266   6      //                if(kx==0)       //ÅÐ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌÐò
+ 267   6      //                {
+ 268   6      //                  delay2(10);
+ 269   6      //                  if(kx==0) break;
+ 270   6      //                }
+ 271   6                
+ 272   6                      if(dianliu1>dianliu0)
+ 273   6                      { 
+ 274   7                        trackfreq=Frequency_Out_9850;
+ 275   7                        switch_track=1;
+ 276   7                        break;
+ 277   7                      }
+ 278   6                      else continue;     
+ 279   6                          
+ 280   6                    }
+ 281   5                  }
+ 282   4                  if(dy==1)          //ÅÐ¶ÏµçÔ´ÊÇ·ñ¹Ø±Õ£¬¹Ø±ÕºóÌø³ö
+ 283   4                  {
+ 284   5                    delay2(10);
+ 285   5                    if(dy==1) 
+ 286   5                    { 
+ 287   6                      hi_bit_xiabiao=data_separation(Frequency_Out_9850);
+ 288   6                      display_freq(hi_bit_xiabiao);
+ 289   6                      delay2(2);
+ 290   6                      dispoutwork();
+ 291   6                      switch_track=0;
+ 292   6                      delay2(2);
+ 293   6                      
+ 294   6                      num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
+ 295   6                      Voltage1=(float)num1*5*1000/256;   //¸ù¾Ý²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹û
+             -×ª»»³É¸¡µãÐÍ
+ 296   6                      dianliu1=(float)disp_track*Voltage1; 
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 6   
+
+ 297   6                      delay2(2);  
+ 298   6                            
+ 299   6                      num2=ReadADC(2);
+ 300   6                      Voltage2=(float)num2*5*1000/256;
+ 301   6                      dianliu2=(float)ljt*Voltage2;                 
+ 302   6                      delay2(2);
+ 303   6                      
+ 304   6                      hi_bit_xiabiao2=data_separation(dianliu1);
+ 305   6                                      display_freq2(hi_bit_xiabiao2);                             
+ 306   6                      hi_bit_xiabiao3=data_separation(dianliu2);                            
+ 307   6                                      display_freq3(hi_bit_xiabiao3);
+ 308   6                    }
+ 309   5                  }
+ 310   4      //            if(kx==0)       //ÅÐ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌÐò
+ 311   4      //            {
+ 312   4      //              delay2(10);
+ 313   4      //              if(kx==0) break;
+ 314   4      //            }
+ 315   4                       
+ 316   4                }    //***********************************************É¨ÆµÑ­»·½áÊø
+ 317   3               //**************************************************************************************************
+             -*¸ú×ÙÑ­»·¿ªÊ¼
+ 318   3                          while(switch_track)            //µçÁ÷¸ú×Ù¿ªÊ¼
+ 319   3                {
+ 320   4                  display_blank1();
+ 321   4                  if(dy==0)      //ÅÐ¶ÏµçÔ´ÊÇ·ñ´ò¿ª£¬´ò¿ªºóÖ´ÐÐ
+ 322   4                        {
+ 323   5                    dispworking();
+ 324   5                    while(1)
+ 325   5                    {
+ 326   6                      hi_bit_xiabiao=data_separation(Frequency_Out_9850);     //ÏÔÊ¾ÆµÂÊ
+ 327   6                      delay2(2);
+ 328   6                      display_freq(hi_bit_xiabiao);
+ 329   6                      i_dianliu=5;
+ 330   6                      while(i_dianliu)
+ 331   6                      {
+ 332   7                        num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
+ 333   7                        Voltage1=(float)num1*5*1000/256;   //¸ù¾Ý²Î¿¼µçÔ´VREFËã³öÊ±¼äµçÑ¹£¬floatÊÇÇ¿ÖÆ×ª»»·ûºÅ£¬ÓÃÓÚ½«½á¹
+             -û×ª»»³É¸¡µãÐÍ
+ 334   7                        dianliu1=(float)disp_track*Voltage1; 
+ 335   7                        sum_dianliu1+=dianliu1;
+ 336   7                        delay2(1);  
+ 337   7                        
+ 338   7                        num2=ReadADC(2);
+ 339   7                        Voltage2=(float)num2*5*1000/256;
+ 340   7                        dianliu2=(float)ljt*Voltage2;                 
+ 341   7                        sum_dianliu2+=dianliu2;
+ 342   7                        delay2(1);
+ 343   7                        i_dianliu-=1;
+ 344   7                      }
+ 345   6                      i_dianliu=5;
+ 346   6                      sum_dianliu1=sum_dianliu1/6;
+ 347   6                      sum_dianliu2=sum_dianliu2/6;
+ 348   6                      hi_bit_xiabiao2=data_separation(sum_dianliu1);
+ 349   6                      display_freq2(hi_bit_xiabiao2);                             
+ 350   6                      hi_bit_xiabiao3=data_separation(sum_dianliu2);                            
+ 351   6                      display_freq3(hi_bit_xiabiao3);
+ 352   6      //                if((sum_dianliu1>sum_dianliu2+20)&&(sum_dianliu1<sum_dianliu2+sl))
+ 353   6      //                {
+ 354   6      //                  Frequency_Out_9850+=sf;     //¼ÓÆµÂÊ½ø¸øÁ¿
+ 355   6      //                  Write_9850();
+ 356   6      //                  delay2(5);
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 7   
+
+ 357   6      //                }               
+ 358   6                      
+ 359   6                      if((sum_dianliu1>sum_dianliu2+sl)&&(sum_dianliu1<sum_dianliu2+ml))
+ 360   6                      {
+ 361   7                        Frequency_Out_9850+=sf;     //¼ÓÆµÂÊ½ø¸øÁ¿
+ 362   7                        Write_9850();
+ 363   7                        delay2(5);
+ 364   7                      }
+ 365   6                      
+ 366   6                      if((sum_dianliu1>sum_dianliu2+ml)&&(sum_dianliu1<sum_dianliu2+ll))
+ 367   6                      {
+ 368   7                        Frequency_Out_9850+=mf;
+ 369   7                        Write_9850();
+ 370   7                        delay2(5);
+ 371   7                      }
+ 372   6                      
+ 373   6                      if(sum_dianliu1>sum_dianliu2+ll)
+ 374   6                      {
+ 375   7                        Frequency_Out_9850+=lf;
+ 376   7                        Write_9850();
+ 377   7                        delay2(5);
+ 378   7                      }
+ 379   6      //                if((sum_dianliu1<sum_dianliu2-20)&&(sum_dianliu1>sum_dianliu2-sl))
+ 380   6      //                {
+ 381   6      //                  Frequency_Out_9850-=sf;
+ 382   6      //                  Write_9850();
+ 383   6      //                  delay2(5);
+ 384   6      //                }
+ 385   6                      
+ 386   6                      if((sum_dianliu1<sum_dianliu2-sl)&&(sum_dianliu1>sum_dianliu2-ml))
+ 387   6                      {
+ 388   7                        Frequency_Out_9850-=sf;
+ 389   7                        Write_9850();
+ 390   7                        delay2(5);
+ 391   7                      }
+ 392   6                                
+ 393   6                      if((sum_dianliu1<sum_dianliu2-ml)&&(sum_dianliu1>sum_dianliu2-ll))
+ 394   6                      {
+ 395   7                        Frequency_Out_9850-=mf;
+ 396   7                        Write_9850();
+ 397   7                        delay2(5);
+ 398   7                      }
+ 399   6                      
+ 400   6                      if(sum_dianliu1<sum_dianliu2-ll)
+ 401   6                      {
+ 402   7                        Frequency_Out_9850-=lf;
+ 403   7                        Write_9850();
+ 404   7                        delay2(5);
+ 405   7                      }
+ 406   6                      
+ 407   6                      delay2(5);
+ 408   6                      if(inde_switch1==1) dispjx1();
+ 409   6                      if(inde_switch1==0) dispjx0();
+ 410   6                      delay2(5);
+ 411   6                      if(sum_dianliu1<50)
+ 412   6                      {
+ 413   7      //                  delay2(10);
+ 414   7      //                  num1=ReadADC(0);      //¶ÁÈ¡µÚ1Â·µçÑ¹Öµ£¬·¶Î§ÊÇ0-255
+ 415   7      //                  Voltage1=(float)num1*5*1000/256;
+ 416   7                        //if(kx==1)
+ 417   7                        //{
+ 418   7                          disperror_I();
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 8   
+
+ 419   7                          error_IF=0;
+ 420   7                          while(!error_IF);   
+ 421   7                        //}
+ 422   7      //                  else continue; 
+ 423   7                      }
+ 424   6                      if(Frequency_Out_9850<low_Fq)
+ 425   6                      {
+ 426   7      //                  delay2(10);
+ 427   7                        //if(kx==1)
+ 428   7                        //{
+ 429   7                          Frequency_Out_9850 = trackfreq;   //ÉèÖÃÉ¨Æµ³õÊ¼ÆµÂÊ
+ 430   7                                        Write_9850();
+ 431   7                          switch_track=0;
+ 432   7                        //}
+ 433   7      //                  else continue; 
+ 434   7                      }
+ 435   6                      if(Frequency_Out_9850>high_Fq)
+ 436   6                      {
+ 437   7      //                  delay2(10);
+ 438   7                        //if(kx==1)
+ 439   7                        //{
+ 440   7                          Frequency_Out_9850 = trackfreq;   //ÉèÖÃÉ¨Æµ³õÊ¼ÆµÂÊ
+ 441   7                                        Write_9850();
+ 442   7                          switch_track=0; 
+ 443   7                        //} 
+ 444   7      //                  else continue;
+ 445   7                      }
+ 446   6                      //if(kx==0) break;   //ÅÐ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌÐò
+ 447   6                      if(dy==1)                //ÅÐ¶ÏµçÔ´ÊÇ·ñ¹Ø±Õ£¬¹Ø±ÕºóÌø³ö
+ 448   6                      {
+ 449   7                        dispoutwork();
+ 450   7                        switch_track=0;
+ 451   7                        while(dy);
+ 452   7                        break;
+ 453   7                      }
+ 454   6                    }   
+ 455   5                  }
+ 456   4                  if(dy==1)                //ÅÐ¶ÏµçÔ´ÊÇ·ñ¹Ø±Õ£¬¹Ø±ÕºóÌø³ö
+ 457   4                  {
+ 458   5                    dispoutwork();
+ 459   5                    switch_track=0;
+ 460   5                    while(dy);
+ 461   5                    break;
+ 462   5                  }
+ 463   4                  //if(kx==0) break;                 //ÅÐ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌÐò
+ 464   4                } //************************************************************************************¸ú×ÙÑ­»·½áÊø
+ 465   3                //if(kx==0) break;                 //ÅÐ¶ÏÊÇ·ñ×Ô¶¯£¬·ñÌø³ö³ÌÐò
+ 466   3              }//**********************************************************************×Ô¶¯´óÑ­»·½áÊø
+ 467   2            //}         //×Ô¶¯if
+ 468   2          //}         //×Ô¶¯if½áÊø
+ 469   2        }
+ 470   1      }//************************************************È«²¿Ñ­»·½áÊø
+ 471          
+ 472          
+ 473          
+ 474           
+ 475          /*------------------------------------------------
+ 476                       ¶ÁAD×ªÖµ³ÌÐò
+ 477          ÊäÈë²ÎÊý Chl ±íÊ¾ÐèÒª×ª»»µÄÍ¨µÀ£¬·¶Î§´Ó0-3
+ 478          ·µ»ØÖµ·¶Î§0-255
+ 479          ------------------------------------------------*/
+ 480          unsigned char ReadADC(unsigned char Chl)
+C51 COMPILER V9.54   MAIN                                                                  06/07/2022 16:15:34 PAGE 9   
+
+ 481          {
+ 482   1        unsigned char Val;
+ 483   1        Start_I2c();               //Æô¶¯×ÜÏß
+ 484   1        SendByte(AddWr);             //·¢ËÍÆ÷¼þµØÖ·
+ 485   1        if(ack==0)return(0);
+ 486   1        SendByte(0x40|Chl);            //·¢ËÍÆ÷¼þ×ÓµØÖ·
+ 487   1        if(ack==0)return(0);
+ 488   1        Start_I2c();
+ 489   1        SendByte(AddWr+1);
+ 490   1        if(ack==0)return(0);
+ 491   1        Val=RcvByte();
+ 492   1        NoAck_I2c();                 //·¢ËÍ·ÇÓ¦Î»
+ 493   1        Stop_I2c();                  //½áÊø×ÜÏß
+ 494   1        return(Val);
+ 495   1      }
+*** WARNING C290 IN LINE 19 OF main.c: missing return value
+*** WARNING C290 IN LINE 55 OF main.c: missing return value
+*** WARNING C290 IN LINE 64 OF main.c: missing return value
+*** WARNING C290 IN LINE 71 OF main.c: missing return value
+*** WARNING C290 IN LINE 78 OF main.c: missing return value
+*** WARNING C290 IN LINE 28 OF main.c: missing return value
+*** WARNING C291 IN LINE 99 OF main.c: not every exit path returns a value
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   3631    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =    125      28
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       1
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  7 WARNING(S),  0 ERROR(S)
